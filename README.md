@@ -6,6 +6,7 @@ This repository contained several tutorials for the RNA-Seq differential express
 
 - A directory with a useful title
 - A `R/analysis.Rmd` file containing the main analysis
+- **Each sentence should be on a different line to make version control easier to deal with**
 - The result of that analysis in `analysis.html`
 - A script to execute all of this analysis (preferably with snakemake)
 
