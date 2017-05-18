@@ -1,0 +1,17 @@
+---
+title: "Dealing with batch effects in sleuth"
+output:
+  html_document:
+    toc: true
+    theme: default
+---
+
+# Preliminaries
+
+Load sleuth:
+
+```{r}
+library('sleuth')
+```
+
+# Do things
