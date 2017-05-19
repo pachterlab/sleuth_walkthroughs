@@ -8,10 +8,166 @@ output:
 
 # Preliminaries
 
+Requirements for this tutorial:
+
+- `biomaRt`
+
 Load sleuth:
 
 ```{r}
 library('sleuth')
 ```
 
-# Do things
+## load metadata
+
+First,
+
+```{r}
+metadata <- read.csv('../metadata/experiment.csv', stringsAsFactors = FALSE)
+```
+
+```{r}
+head(metadata)
+```
+
+
+
+```{r}
+extract_metadata <- function(library_name) {
+  ret <- lapply(strsplit(library_name, '_'),
+    function(x) {
+      data.frame(strain = x[1], experiment = x[2], lane = x[3],
+        stringsAsFactors = FALSE)
+    })
+  dplyr::bind_rows(ret)
+}
+
+metadata <- dplyr::select(metadata, -strain)
+metadata <- dplyr::bind_cols(metadata, extract_metadata(metadata$library_name))
+metadata <- dplyr::select(metadata, run_accession, library_name, strain,
+  experiment, lane)
+```
+
+The last thing we need is the file paths to kallisto output:
+
+```{r}
+metadata <- dplyr::mutate(metadata,
+  path = file.path('..', 'results', 'single', run_accession, 'kallisto'))
+head(metadata)
+```
+
+```{r}
+metadata <- dplyr::rename(metadata, sample = run_accession)
+```
+
+## getting gene annotation
+
+```{r}
+mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
+  dataset = "mmusculus_gene_ensembl",
+  host = "dec2015.archive.ensembl.org")
+  # host = "ensembl.org")
+ttg <- biomaRt::getBM(
+  attributes = c("ensembl_transcript_id", "transcript_version",
+  "ensembl_gene_id", "external_gene_name", "description",
+  "transcript_biotype"),
+  mart = mart)
+ttg <- dplyr::rename(ttg,
+  ens_gene = ensembl_gene_id, ext_gene = external_gene_name)
+ttg <- dplyr::mutate(ttg, target_id = paste(ensembl_transcript_id,
+  transcript_version, sep = "."))
+head(ttg)
+```
+
+TODO: explain columns here
+
+## prepping the analysis
+
+```{r}
+so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
+  aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
+```
+
+## seeing the batch effects
+
+```{r}
+plot_pca(so, color_by = 'strain')
+```
+
+```{r}
+plot_pca(so, color_by = 'lane')
+```
+
+## fitting the full model
+
+
+```{r}
+so <- sleuth_fit(so, ~lane + strain)
+```
+
+## fitting the reduced model
+
+```{r}
+so <- sleuth_fit(so, ~lane, 'reduced')
+```
+
+## computing the test
+
+```{r}
+so <- sleuth_lrt(so, 'reduced', 'full')
+```
+
+```{r}
+sleuth_table <- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE)
+sleuth_significant <- dplyr::filter(sleuth_table, qval <= 0.05)
+```
+
+## ignoring batch
+
+```{r}
+so <- sleuth_fit(so, ~strain, 'strain')
+so <- sleuth_fit(so, ~1, 'intercept')
+so <- sleuth_lrt(so, 'intercept', 'strain')
+```
+
+```{r}
+strain_only <- sleuth_results(so, 'intercept:strain', 'lrt', show_all = FALSE)
+strain_only <- distinct(dplyr::select(strain_only, target_id, qval))
+strain_only_significant <- dplyr::filter(strain_only, qval <= 0.05)
+```
+
+
+
+# Comparing to the microarray data
+
+```{r}
+illumina <- data.table::fread('../results/journal.pone.0017820.s011.TXT',
+  data.table = FALSE)
+```
+
+```{r}
+affymetrix <- data.table::fread('../results/journal.pone.0017820.s010.TXT',
+  data.table = FALSE)
+```
+
+## merging all of the results
+
+```{r}
+illumina <- dplyr::select(illumina, target_id = Ensembl, illumina_qval = q.value)
+affymetrix <- dplyr::select(affymetrix, target_id = Ensembl, affymetrix_qval = q.value)
+```
+
+```{r}
+all_methods <- Reduce(
+  function(x, y) {
+    dplyr::inner_join(x, y, by = 'target_id')
+  },
+  list(
+    dplyr::select(sleuth_table, target_id, with_batch_qval = qval),
+    dplyr::select(strain_only, target_id, without_batch_qval = qval),
+    illumina,
+    affymetrix)
+)
+
+all_methods <- dplyr::distinct(all_methods)
+```
