@@ -1,0 +1,9 @@
+include: '../config.py'
+
+rule all:
+    input: 'analysis.html'
+
+rule analysis:
+    output: 'analysis.html'
+    shell:
+        source_rmd('R', 'analysis.Rmd')
