@@ -1,0 +1,78 @@
+---
+title: "Differential analysis with multiple conditions and covariates"
+output:
+  html_document:
+    toc: true
+    theme: default
+---
+
+# Introduction
+
+The purpose of this walkthrough is to demonstrate the use of __sleuth__ for analaysis of an experiment in which a "control" condition is to be compared to multiple different experimental conditions.
+We illustrate this use case with data from Boj _et al_., Organoid models of human and mouse ductal pancreatic cancer, Cell, 2015. 
+One of the experiments the paper describes is RNA-Seq performed on syngenic mice organoids. 
+Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT).
+
+A total of 19 samples were sequenced, according to the following experimental design:
+
+In this walkthrough we explain how to test for genes differential in at least one of the abnormal species (PanIN or mT), while conditioning on the sex of the mouse.
+
+
+# Preliminaries
+
+Requirements for this tutorial:
+
+- knowledge of how to use sleuth for simple two condition experiments (see [link here])
+- __kallisto__ quantified samples from GEO GSE63348 (SRA SRP049959)
+- the SRA runtable, downloadable from 
+
+The SRA runtable looks like this:
+
+# Basic quality control
+
+Before beginning analysis, it is useful to examine the overall structure of the data. The PCA plot below shows the samples and verifies that samples cluster by condition:
+
+[PCA colored by condition]
+
+Alternatively, samples can be sorted by sex:
+
+[Sex colored PCA]
+
+An examination of the MA plot (see Cuffdiff walkthrough) reveals the data to be reasonable well behaved.
+
+# Testing for differential genes
+
+The first test we perform is to identify genes that are differently expressed in either the mT or PanIN conditions.
+To do this we first specify a "full" model for sleuth. This model contains parameters that are specific to both sex and condition. 
+That is, sleuth models the data as:
+
+[math formula]
+
+To identify differential genes sleuth will compare expression values estimated according to the full model, with those of a reduced model. 
+In this case, the reduced model estimates parameters only according to sex.
+This has the effect of modeling the data according to the assumption that expression is independent of condition. 
+By comparing expression estimates deirved according to the two models, sleuth is able to identify outliers that represent genes who expression can be explained much more accurately when considering condition.
+
+The sleuth commands for performing the differential analysis are:
+
+# Comparison with a naive analysis
+
+A naive analysis of the data would be to ignore the sex of each mouse, and to just test for differences among conditions.
+This is done with the commands:
+
+
+# Testing for sex effects
+
+To understand why te naive analysis is problematic, it is helpful to examine genes that are differ according to sex while conditioning on the experimental condition.
+The commands for performing such a differential analysis are:
+
+
+
+Evidently, genes such as [..] which emerge as significantly different in the naive analysis, reveal difference in sex rather than condition. 
+
+
+
+
+
+
+
