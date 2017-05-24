@@ -24,7 +24,7 @@ Requirements for this tutorial:
 
 - knowledge of how to use sleuth for simple two condition experiments (see [link here])
 - __kallisto__ quantified samples from GEO GSE63348 (SRA SRP049959). [Download here](https://www.dropbox.com/s/8swoeu94candjxd/Boj_results.zip?dl=0).
-- the SRA runtable, downloadable from
+- the SRA runtable. [Download here](https://raw.githubusercontent.com/pachterlab/sleuth_walkthroughs/master/boj/metadata/SraRunTable.txt).
 
 
 ```{r}
@@ -124,8 +124,6 @@ We see now that the PCA is much more well-behaved and the separation between gen
 ```{r}
 plot_pca(so, color_by = 'genotype', text_labels = TRUE)
 ```
-
-
 
 An examination of the MA plot (see Cuffdiff walkthrough) reveals the data to be reasonable well behaved.
 
