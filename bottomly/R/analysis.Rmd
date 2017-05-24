@@ -1,16 +1,27 @@
 ---
-title: "Dealing with batch effects in sleuth"
+title: "Accounting for batch effects in sleuth"
 output:
   html_document:
     toc: true
     theme: default
 ---
+# Introduction
+
+This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. The example uses data from the paper Bottomly et al., Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays, PLoS One, 2011. 
+ 
 
 # Preliminaries
 
-Requirements for this tutorial:
+Requirements for this walkthrough:
 
 - `biomaRt`
+
+To install the package enter:
+
+```
+source("https://bioconductor.org/biocLite.R")
+biocLite("biomaRt")
+```
 
 Load sleuth:
 
@@ -20,17 +31,17 @@ library('sleuth')
 
 ## load metadata
 
-First,
+Begin by loading the metadata file:
 
 ```{r}
 metadata <- read.csv('../metadata/experiment.csv', stringsAsFactors = FALSE)
 ```
 
 ```{r}
-head(metadata)
+head(metadat, n=20a)
 ```
 
-
+This file describes the experimental design. The first column lists the short read archive accession for each sample that is part of the experiment to be analayzed. The biological condition is recorded in the "strain" column. The last two columns describe how the sequencing was undertaken and reveal that certain batches were sequenced together.
 
 ```{r}
 extract_metadata <- function(library_name) {
