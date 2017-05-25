@@ -23,7 +23,13 @@ In this walkthrough we explain how to test for genes differential in at least on
 Requirements for this tutorial:
 
 - knowledge of how to use sleuth for simple two condition experiments (see [link here])
-- __kallisto__ quantified samples from GEO GSE63348 (SRA SRP049959). [Download here](https://www.dropbox.com/s/8swoeu94candjxd/Boj_results.zip?dl=0).
+- __kallisto__ quantified samples from GEO GSE63348 (SRA SRP049959).
+
+```{bash eval=FALSE}
+wget -O ../Boj_results.zip 'https://www.dropbox.com/s/8swoeu94candjxd/Boj_results.zip?dl=1'
+unzip ../Boj_results.zip -d ../results
+```
+
 - the SRA runtable. [Download here](https://raw.githubusercontent.com/pachterlab/sleuth_walkthroughs/master/boj/metadata/SraRunTable.txt).
 
 
@@ -50,7 +56,7 @@ sample_to_condition <- dplyr::select(sample_to_condition,
 
 ## getting gene annotation
 
-```{r}
+```{r cache=TRUE}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
   dataset = "mmusculus_gene_ensembl",
   host = "dec2015.archive.ensembl.org")
@@ -72,7 +78,7 @@ sample_to_condition <- dplyr::mutate(sample_to_condition,
   path = file.path('..', 'results', sample_ids, 'kallisto'))
 ```
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_prep(sample_to_condition, ~sex + genotype, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
@@ -113,7 +119,7 @@ In the next step, let's remove it.
 sample_to_condition <- dplyr::filter(sample_to_condition, sample != 'SRR1654638')
 ```
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_prep(sample_to_condition, ~sex + genotype, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```

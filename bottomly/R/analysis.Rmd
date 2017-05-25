@@ -31,7 +31,7 @@ biocLite("biomaRt")
 - The kallisto results which can be downloaded from your terminal with:
 
 ```{bash eval=FALSE}
-wget -O ../Bottomly_results.zip https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1
+wget -O ../Bottomly_results.zip 'https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1'
 unzip ../Bottomly_results.zip -d ../results
 ```
 
