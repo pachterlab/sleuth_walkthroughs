@@ -28,7 +28,7 @@ source("https://bioconductor.org/biocLite.R")
 biocLite("biomaRt")
 ```
 
-- The kallisto results which can be downloaded:
+- The kallisto results which can be downloaded from your terminal with:
 
 ```{bash eval=FALSE}
 wget -O ../Bottomly_results.zip https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1
@@ -81,7 +81,7 @@ Finally, we add the path names of the kallisto output directories to the metadat
 
 ```{r}
 metadata <- dplyr::mutate(metadata,
-  path = file.path('', 'results', run_accession, 'kallisto'))
+  path = file.path('..', 'results', run_accession, 'kallisto'))
 head(metadata)
 ```
 
@@ -116,19 +116,26 @@ head(ttg)
 The resulting table contains Ensembl gene names (column 3) and the associated transcripts (column 1). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto.
 In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.
 
-## Preparing the analysis
+# Preparing the analysis
 
 ```{r}
 # TODO: temporary -- remove
 metadata <- dplyr::filter(metadata, sample != 'SRR099223')
 ```
 
-```{r}
+TODO: explain what this prep does.
+
+```{r cache=TRUE}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
-## The naïve analysis
+Notice the warning: "518 target_ids are missing annotations for the aggregation_column: ens_gene."
+This means that there are transcripts that do not have a gene mapping.
+This is pretty common in most annotations.
+However, if this number is quite high, you might consider using another transcript-to-gene mapping or another annotation entirely.
+
+# The naïve analysis
 
 As discussed in the Trapnell _et al_. walkthough, to identify genes differential between two conditions two models must be fit by sleuth.
 The first is known as the reduced model, and in this case we name the "intercept model".
@@ -174,7 +181,7 @@ plot_pca(so, color_by = 'lane')
 
 This batch effect is problematic, as genes might be identified as differential in the strain analysis merely because they were sequenced on different lanes.
 
-## Batch analysis
+# Batch analysis
 
 To test whether this is in fact the case, the test described above can be repeated with the full model comprising a paramter for "lane" instead of "strain".
 
