@@ -12,13 +12,23 @@ This walkthrough teaches how to test for differential expression in a way that i
 
 # Preliminaries
 
+Make sure you are in the `R` directory.
+This can be done with `setwd()`.
+
 Requirements for this walkthrough:
 
 - `biomaRt`
+- The kallisto results which can be downloaded:
+
+```{bash eval=FALSE}
+wget -O ../Bottomly_results.zip https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1
+unzip ../Bottomly_results.zip -d ../results
+```
+
 
 To install the package enter:
 
-```
+```{r eval=FALSE}
 source("https://bioconductor.org/biocLite.R")
 biocLite("biomaRt")
 ```
@@ -64,7 +74,7 @@ Finally, we add the path names of the kallisto output directories to the metadat
 
 ```{r}
 metadata <- dplyr::mutate(metadata,
-  path = file.path('..', 'results', 'single', run_accession, 'kallisto'))
+  path = file.path('..', 'results', run_accession, 'kallisto'))
 head(metadata)
 ```
 It is important to spot check the metadata file again to make sure that the kallisto runs correspond to the accession numbers in the table, so that each row is associated with the correct sample.
@@ -87,16 +97,19 @@ ttg <- biomaRt::getBM(
   "ensembl_gene_id", "external_gene_name", "description",
   "transcript_biotype"),
   mart = mart)
-ttg <- dplyr::rename(ttg,
+ttg <- dplyr::rename(ttg, target_id = ensembl_transcript_id,
   ens_gene = ensembl_gene_id, ext_gene = external_gene_name)
-ttg <- dplyr::mutate(ttg, target_id = paste(ensembl_transcript_id,
-  transcript_version, sep = "."))
 head(ttg)
 ```
 
 The resulting table contains Ensembl gene names (column 3) and the associated transcripts (column 1). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto. In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.
 
 ## Preparing the analysis
+
+```{r}
+# TODO: temporary -- remove
+metadata <- dplyr::filter(metadata, sample != 'SRR099223')
+```
 
 ```{r}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
