@@ -1,16 +1,15 @@
-# sleuth tutorials
+# sleuth walkthroughs
 
-This repository contained several tutorials for the RNA-Seq differential expression analysis tool, **[sleuth](http://pachterlab.github.io/sleuth/)**.
+This repository contained several walkthroughs for **[sleuth](http://pachterlab.github.io/sleuth/)**. They teach various use cases for sleuth and provide guidance on solutions for frequently tackled problems.
 
-## Requirements
+## Specifications for a walkthrough
 
 - A directory with a useful title
-- A `R/analysis.Rmd` file containing the main analysis
-- **Each sentence should be on a different line to make version control easier to deal with**
+- An `R/analysis.Rmd` file containing the main analysis
+- **Each sentence should be on a different line to facilitate version control** 
 - The result of that analysis in `analysis.html`
 - A script to execute all of this analysis (preferably with snakemake)
 
-Everything else is optional to create a relatively unrestrictive environment.
 
 ## Issues
 

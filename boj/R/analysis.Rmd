@@ -1,22 +1,31 @@
 ---
 title: "Differential analysis with multiple conditions and covariates"
+
+date: "`r Sys.Date()"
+author:
+- Harold Pimentel
+- Nicolas Bray
+- Páll Melsted
+- Lior Pachter
+
 output:
   html_document:
-    toc: true
+    toc: false
     theme: default
+
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple conditions and covariates."
 ---
 
 # Introduction
 
 The purpose of this walkthrough is to demonstrate the use of __sleuth__ for analaysis of an experiment in which a "control" condition is to be compared to multiple different experimental conditions.
-We illustrate this use case with data from Boj _et al_., Organoid models of human and mouse ductal pancreatic cancer, Cell, 2015.
+We illustrate this use case with data from the paper Boj _et al_., [Organoid models of human and mouse ductal pancreatic cancer](http://www.sciencedirect.com/science/article/pii/S009286741401592X), Cell, 2015.
 One of the experiments the paper describes is RNA-Seq performed on syngenic mice organoids.
 Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT).
 
 A total of 19 samples were sequenced, according to the following experimental design:
 
-In this walkthrough we explain how to test for genes differential in at least one of the abnormal species (PanIN or mT), while conditioning on the sex of the mouse.
-
+This walkthrough explains how to test for genes differential in _at least_ one of the abnormal samples (PanIN or mT), while conditioning on the sex of the mouse.
 
 # Preliminaries
 
@@ -32,23 +41,22 @@ library('sleuth')
 ```
 
 The SRA runtable looks like this:
-
 ```{r}
 sample_to_condition <- read.table('../metadata/SraRunTable.txt', header = TRUE,
   sep = '\t')
 head(sample_to_condition)
 ```
 
-Let's clean it up a bit and keep only the columns that we need:
+The SRA table contains metadata that is not relevant and it is convenient to simplify it with
 
 ```{r}
 sample_to_condition <- dplyr::select(sample_to_condition,
   sample = run, sex = Sex_s, genotype = mouse_genotype_s)
 ```
 
-## getting the gene names
+## Associating transcripts to genes
 
-## getting gene annotation
+As described in the Bottomly _et al_. tutorial, transcripts are associated to genes with the commands
 
 ```{r}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",

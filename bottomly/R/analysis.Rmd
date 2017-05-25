@@ -4,7 +4,6 @@ author:
 - Harold Pimentel
 - Nicolas Bray
 - Páll Melsted
-- Suzette Puente
 - Lior Pachter
 
 output:
@@ -140,7 +139,7 @@ In other words, to use Ensembl transcript-gene associations kallisto was run usi
 metadata <- dplyr::filter(metadata, sample != 'SRR099223')
 ```
 
-TODO: explain what this prep does.
+The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed: 
 
 ```{r cache=TRUE}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
@@ -150,7 +149,7 @@ so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
 Notice the warning: "518 target_ids are missing annotations for the aggregation_column: ens_gene."
 This means that there are transcripts that do not have a gene mapping.
 This is pretty common in most annotations.
-However, if this number is quite high, you might consider using another transcript-to-gene mapping or another annotation entirely.
+However, if this number is very high, it is advisable to consider using another transcript-to-gene mapping or another annotation.
 
 # The naïve analysis
 
@@ -185,6 +184,11 @@ head(sleuth_significant_strain, 20)
 ```
 
 Gene abundances can be viewed to confirm the differential analysis:
+
+```{r}
+plot_bootstrap(so,"ENSMUSG00000066553",units="scaled_reads_per_base",color_by = "strain", x_axis_angle = 50)
+```
+
 
 
 However visualization of gene abundances is not sufficient to fully quality control an experiment. A principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
@@ -247,4 +251,5 @@ head(sleuth_significant, 20)
 
 While the top 8 genes are the same as in the naïve analysis, differences start to emerge afterwards.
 Furthermore, the top genes emerge as more significantly differential when conditioning on batch.
+
 
