@@ -1,21 +1,37 @@
 ---
-title: "Accounting for batch effects in sleuth"
+title: "Accounting for batch effects in [sleuth](http://pachterlab.github.io/sleuth/about)"
+author:
+- Harold Pimentel
+- Nicolas Bray
+- Páll Melsted
+- Lior Pachter
+
 output:
   html_document:
-    toc: true
+    toc: false
     theme: default
+
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates via an example of conditioning on batch effect."
 ---
 
 # Introduction
 
-This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data.
-The example uses data from the paper Bottomly et al., Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays, _PLoS One_, 2011.
+This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. 
+The example uses data from the paper Bottomly et al., [Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays](TODO), _PLoS One_, 2011. 
+In addition to this walkthrough, data from the paper was is used for some of the [analyses in the sleuth paper](TODO). 
+The specific data that are examined in this walkthrough are 21 RNA-Seq samples from striatal samples extracted from two different mouse strains. 
+The strains are C57BL/6J (B6) and DBA/2J (D2). 
+The Bottomly _et al_. analysis focuses on a comparison of the RNA-Seq gene expression estimates to microarray estimates. 
+In this walkthrough we examine in detail how to analyze the RNA-Seq.
 
+The walkthrough is self-contained, but new users to sleuth will benefit from first studying the Trapnell _et al_. walkthrough which demonstrates the use of sleuth on a simple two condition experiment. 
+This walkthrough, in addition to illustrating how to condition on batch effects, provides an example for how to use sleuth for analyses of experimental designs with multiple covariates. 
+The tutorial also moves beyond the isoform-level analysis of the Trapnell _et al_. walkthrough and illustrates how to perform gene-level analysis.
 
 # Preliminaries
 
-Make sure you are in the `R` directory.
-This can be done with `setwd()`.
+Create a directory for the analysis and start up `R`. 
+Set the working directory with the `setwd()` command.
 
 Requirements for this walkthrough:
 
@@ -28,7 +44,7 @@ source("https://bioconductor.org/biocLite.R")
 biocLite("biomaRt")
 ```
 
-- The kallisto results which can be downloaded from your terminal with:
+- The walthrough begins after the RNA-Seq samples have been quantified with kallisto. While kallisto is very fast in quantifying samples, downloading the raw data from the short read archive is time consuming. kallisto quantifications are therefore directly downloadable for the relevant samples using
 
 ```{bash eval=FALSE}
 wget -O ../Bottomly_results.zip 'https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1'
@@ -123,7 +139,7 @@ In other words, to use Ensembl transcript-gene associations kallisto was run usi
 metadata <- dplyr::filter(metadata, sample != 'SRR099223')
 ```
 
-TODO: explain what this prep does.
+The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed: 
 
 ```{r cache=TRUE}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
@@ -133,7 +149,7 @@ so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
 Notice the warning: "518 target_ids are missing annotations for the aggregation_column: ens_gene."
 This means that there are transcripts that do not have a gene mapping.
 This is pretty common in most annotations.
-However, if this number is quite high, you might consider using another transcript-to-gene mapping or another annotation entirely.
+However, if this number is very high, it is advisable to consider using another transcript-to-gene mapping or another annotation.
 
 # The naïve analysis
 
@@ -161,13 +177,21 @@ sleuth_table_strain <- sleuth_results(so, 'intercept:strain', 'lrt', show_all = 
 sleuth_significant_strain <- dplyr::filter(sleuth_table_strain, qval <= 0.05)
 ```
 
-The most significant genes are
+The most significantly differential genes are
 
 ```{r}
 head(sleuth_significant_strain, 20)
 ```
 
-A (poor) analysis might end here, but a principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
+Gene abundances can be viewed to confirm the differential analysis:
+
+```{r}
+plot_bootstrap(so,"ENSMUSG00000066553",units="scaled_reads_per_base",color_by = "strain", x_axis_angle = 50)
+```
+
+
+
+However visualization of gene abundances is not sufficient to fully quality control an experiment. A principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
 
 ```{r}
 plot_pca(so, color_by = 'strain')
@@ -227,3 +251,5 @@ head(sleuth_significant, 20)
 
 While the top 8 genes are the same as in the naïve analysis, differences start to emerge afterwards.
 Furthermore, the top genes emerge as more significantly differential when conditioning on batch.
+
+
