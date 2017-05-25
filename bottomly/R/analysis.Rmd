@@ -1,16 +1,25 @@
 ---
-title: "Accounting for batch effects in sleuth"
+title: "Accounting for batch effects in [sleuth](http://pachterlab.github.io/sleuth/about)"
+author:
+- Harold Pimentel
+- Nicolas Bray
+- Páll Melsted
+- Suzette Puente
+- Lior Pachter
+
 output:
   html_document:
-    toc: true
+    toc: false
     theme: default
+
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates via an example of conditioning on batch effect."
 ---
 
 # Introduction
 
 This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. 
-The example uses data from the paper Bottomly et al., Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays, _PLoS One_, 2011. 
-In addition to this walkthrough, data from the paper was is used for some of the analyses in the sleuth paper. 
+The example uses data from the paper Bottomly et al., [Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays](TODO), _PLoS One_, 2011. 
+In addition to this walkthrough, data from the paper was is used for some of the [analyses in the sleuth paper](TODO). 
 The specific data that are examined in this walkthrough are 21 RNA-Seq samples from striatal samples extracted from two different mouse strains. 
 The strains are C57BL/6J (B6) and DBA/2J (D2). 
 The Bottomly _et al_. analysis focuses on a comparison of the RNA-Seq gene expression estimates to microarray estimates. 
@@ -177,9 +186,6 @@ head(sleuth_significant_strain, 20)
 
 Gene abundances can be viewed to confirm the differential analysis:
 
-```{r}
-plot_bootstrap(so,"ENSMUSG00000066553",units="scaled_reads_per_base",color_by="strain", x_axis_angle =50)
-```
 
 However visualization of gene abundances is not sufficient to fully quality control an experiment. A principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
 
