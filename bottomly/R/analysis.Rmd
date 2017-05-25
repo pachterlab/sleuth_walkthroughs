@@ -76,7 +76,7 @@ Finally, we add the path names of the kallisto output directories to the metadat
 
 ```{r}
 metadata <- dplyr::mutate(metadata,
-  path = file.path('/Users/lpachter/data/sleuth_walkthroughs/Bottomly', 'results', 'single', run_accession, 'kallisto'))
+  path = file.path('', 'results', 'single', run_accession, 'kallisto'))
 head(metadata)
 ```
 It is important to spot check the metadata file again to make sure that the kallisto runs correspond to the accession numbers in the table, so that each row is associated with the correct sample.
