@@ -7,7 +7,7 @@ output:
 ---
 # Introduction
 
-This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. The example uses data from the paper Bottomly et al., Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays, PLoS One, 2011.
+This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. The example uses data from the paper Bottomly et al., Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays, _PLoS One_, 2011.
 
 
 # Preliminaries
@@ -29,16 +29,17 @@ Load sleuth:
 library('sleuth')
 ```
 
-## load metadata
+## Parsing metadata
 
-Begin by loading the metadata file:
+A sleuth analysis is dependent on a metadata file, which describes the experimental design, the sample names, conditions and covariates. The metadata file is external to sleuth, and must be prepared prior to analysis. The first step in a sleuth analysis is loading of the metadata file:
+
 
 ```{r}
 metadata <- read.csv('../metadata/experiment.csv', stringsAsFactors = FALSE)
 ```
 
 ```{r}
-head(metadata, n = 20)
+head(metadata,n = 20)
 ```
 
 This file describes the experimental design. The first column lists the short read archive accession for each sample that is part of the experiment to be analayzed. The biological condition is recorded in the "strain" column. The last two columns describe how the sequencing was undertaken and reveal that certain batches were sequenced together.
@@ -59,19 +60,22 @@ metadata <- dplyr::select(metadata, run_accession, library_name, strain,
   experiment, lane)
 ```
 
-The last thing we need is the file paths to kallisto output:
+Finally, we add the path names of the kallisto output directories to the metadata table:
 
 ```{r}
 metadata <- dplyr::mutate(metadata,
   path = file.path('..', 'results', 'single', run_accession, 'kallisto'))
 head(metadata)
 ```
+It is important to spot check the metadata file again to make sure that the kallisto runs correspond to the accession numbers in the table, so that each row is associated with the correct sample.
 
 ```{r}
 metadata <- dplyr::rename(metadata, sample = run_accession)
 ```
 
-## getting gene annotation
+## Associating transcripts to genes
+
+The sample quantifications performed by kallisto have produced transcript abundance and count estimates. These have been parsed by sleuth in the steps just performed, however sleuth does not "know" about genes yet. To perform gene-level analysis sleuth must parse a gene annotation. One easy way to do this is using biomaRt and Ensembl:
 
 ```{r}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
@@ -90,16 +94,16 @@ ttg <- dplyr::mutate(ttg, target_id = paste(ensembl_transcript_id,
 head(ttg)
 ```
 
-TODO: explain columns here
+The resulting table contains Ensembl gene names (column 3) and the associated transcripts (column 1). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto. In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.
 
-## prepping the analysis
+## Preparing the analysis
 
 ```{r}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
-## seeing the batch effects
+## Examining the batch effects
 
 ```{r}
 plot_pca(so, color_by = 'strain')
