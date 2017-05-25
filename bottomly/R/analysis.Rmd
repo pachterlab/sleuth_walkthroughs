@@ -18,6 +18,14 @@ This can be done with `setwd()`.
 Requirements for this walkthrough:
 
 - `biomaRt`
+
+To install the package:
+
+```{r eval=FALSE}
+source("https://bioconductor.org/biocLite.R")
+biocLite("biomaRt")
+```
+
 - The kallisto results which can be downloaded:
 
 ```{bash eval=FALSE}
@@ -25,15 +33,9 @@ wget -O ../Bottomly_results.zip https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottom
 unzip ../Bottomly_results.zip -d ../results
 ```
 
-
-To install the package enter:
-
-```{r eval=FALSE}
-source("https://bioconductor.org/biocLite.R")
-biocLite("biomaRt")
-```
-
-Load sleuth:
+- `sleuth`
+ 
+To install sleuth:
 
 ```{r}
 library('sleuth')
@@ -74,7 +76,7 @@ Finally, we add the path names of the kallisto output directories to the metadat
 
 ```{r}
 metadata <- dplyr::mutate(metadata,
-  path = file.path('..', 'results', run_accession, 'kallisto'))
+  path = file.path('/Users/lpachter/data/sleuth_walkthroughs/Bottomly', 'results', 'single', run_accession, 'kallisto'))
 head(metadata)
 ```
 It is important to spot check the metadata file again to make sure that the kallisto runs correspond to the accession numbers in the table, so that each row is associated with the correct sample.
@@ -116,54 +118,86 @@ so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
-## Examining the batch effects
+## The naïve analysis
+
+As discussed in the Trapnell _et al_. walkthough, to identify genes differential between two conditions two models must be fit by sleuth. The first is known as the reduced model, and in this case we name the "intercept model". It fits a single parameter for each gene thereby enforcing equal abundances between conditions. The second model is known as the full model, and it includes a parameter that is strain dependent. We call it the "strain model". With the likelihood ratio test sleuth identifies genes whose abundances are significantly better explained when strain is taken into account. The mechanics of the fitting are: 
+
+```{r}
+so <- sleuth_fit(so, ~1, 'intercept')
+so <- sleuth_fit(so, ~strain, 'strain')
+```
+The likelihood ratio test (lrt) is performed with
+
+```{r}
+so <- sleuth_lrt(so, 'intercept', 'strain')
+```
+
+Significantly differential genes are extracted with the commands
+```{r}
+sleuth_table_strain <- sleuth_results(so, 'intercept:strain', 'lrt', show_all = FALSE)
+sleuth_significant_strain <- dplyr::filter(sleuth_table_strain, qval <= 0.05)
+```
+
+The most significant genes are
+
+```{r}
+head(sleuth_significant_strain,20)
+```
+
+A (poor) analysis might end here, but a principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
 
 ```{r}
 plot_pca(so, color_by = 'strain')
 ```
 
+The source of the clustering is revealed by coloring the samples by "lane" instead:
+
 ```{r}
 plot_pca(so, color_by = 'lane')
 ```
 
-## fitting the full model
+This batch effect is problematic, as genes might be identified as differential in the strain analysis merely because they were sequenced on different lanes. 
 
+## Batch analysis
+
+To test whether this is in fact the case, the test described above can be repeated with the full model comprising a paramter for "lane" instead of "strain".
 
 ```{r}
-so <- sleuth_fit(so, ~lane + strain)
+so <- sleuth_fit(so, ~lane, 'lane')
 ```
 
-## fitting the reduced model
-
+The likelihood ratio test is performed as before except with the lane model
 ```{r}
-so <- sleuth_fit(so, ~lane, 'reduced')
+so <- sleuth_lrt(so, 'intercept', 'lane')
 ```
 
-## computing the test
-
+The differential analysis test now reveals genes most affected by batch:
 ```{r}
-so <- sleuth_lrt(so, 'reduced', 'full')
+sleuth_table_lane <- sleuth_results(so, 'intercept:lane', 'lrt', show_all = FALSE)
+sleuth_significant_lane <- dplyr::filter(sleuth_table_lane, qval <= 0.05)
+head(sleuth_significant_lane,20)
 ```
 
+To identify genes that are truly differential between strain, it is therefore necessary to fit and account for the (lane) batch effect.
+
+## Fitting a model that acounts for batch
+
+To account for batch while testing for strain differences, the full model must include parameters for both lane and strain.
+
 ```{r}
-sleuth_table <- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE)
+so <- sleuth_fit(so, ~lane + strain, 'full')
+```
+
+The reduced model must still include a parameter for the lane. In this way, the strain differences are accounted for while conditioning on the lane. This model, the "lane model" has already been fit. So the likelihood ratio test can now be applied as before:
+
+```{r}
+so <- sleuth_lrt(so, 'lane', 'full')
+sleuth_table <- sleuth_results(so, 'lane:full', 'lrt', show_all = FALSE)
 sleuth_significant <- dplyr::filter(sleuth_table, qval <= 0.05)
+head(sleuth_significant,20)
 ```
 
-## ignoring batch
-
-```{r}
-so <- sleuth_fit(so, ~strain, 'strain')
-so <- sleuth_fit(so, ~1, 'intercept')
-so <- sleuth_lrt(so, 'intercept', 'strain')
-```
-
-```{r}
-strain_only <- sleuth_results(so, 'intercept:strain', 'lrt', show_all = FALSE)
-strain_only <- distinct(dplyr::select(strain_only, target_id, qval))
-strain_only_significant <- dplyr::filter(strain_only, qval <= 0.05)
-```
-
+While the top 8 genes are the same as in the naïve analysis, differences start to emerge afterwards. Furthermore, the top genes emerge as more significantly differential when conditioning on batch. 
 
 
 # Comparing to the microarray data
