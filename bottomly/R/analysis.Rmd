@@ -1,23 +1,41 @@
 ---
-title: "Accounting for batch effects in sleuth"
+title: "Accounting for batch effects in [sleuth](http://pachterlab.github.io/sleuth/about)"
+author:
+- Harold Pimentel
+- Nicolas Bray
+- Páll Melsted
+- Lior Pachter
+
 output:
   html_document:
-    toc: true
+    toc: false
     theme: default
+
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates via an example of conditioning on batch effect."
 ---
+
 # Introduction
 
-This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. The example uses data from the paper Bottomly et al., Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays, _PLoS One_, 2011.
+This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. 
+The example uses data from the paper Bottomly et al., [Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays](TODO), _PLoS One_, 2011. 
+In addition to this walkthrough, data from the paper was is used for some of the [analyses in the sleuth paper](TODO). 
+The specific data that are examined in this walkthrough are 21 RNA-Seq samples from striatal samples extracted from two different mouse strains. 
+The strains are C57BL/6J (B6) and DBA/2J (D2). 
+The Bottomly _et al_. analysis focuses on a comparison of the RNA-Seq gene expression estimates to microarray estimates. 
+In this walkthrough we examine in detail how to analyze the RNA-Seq.
 
+The walkthrough is self-contained, but new users to sleuth will benefit from first studying the Trapnell _et al_. walkthrough which demonstrates the use of sleuth on a simple two condition experiment. 
+This walkthrough, in addition to illustrating how to condition on batch effects, provides an example for how to use sleuth for analyses of experimental designs with multiple covariates. 
+The tutorial also moves beyond the isoform-level analysis of the Trapnell _et al_. walkthrough and illustrates how to perform gene-level analysis.
 
 # Preliminaries
 
-Make sure you are in the `R` directory.
-This can be done with `setwd()`.
+Create a directory for the analysis and start up `R`. 
+Set the working directory with the `setwd()` command.
 
 Requirements for this walkthrough:
 
-- `biomaRt`
+- `biomaRt` for extracting the Ensembl transcript to gene mapping. For alternative methods, [please see this walk-through](TODO).
 
 To install the package:
 
@@ -26,15 +44,15 @@ source("https://bioconductor.org/biocLite.R")
 biocLite("biomaRt")
 ```
 
-- The kallisto results which can be downloaded:
+- The walthrough begins after the RNA-Seq samples have been quantified with kallisto. While kallisto is very fast in quantifying samples, downloading the raw data from the short read archive is time consuming. kallisto quantifications are therefore directly downloadable for the relevant samples using
 
 ```{bash eval=FALSE}
-wget -O ../Bottomly_results.zip https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1
+wget -O ../Bottomly_results.zip 'https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1'
 unzip ../Bottomly_results.zip -d ../results
 ```
 
 - `sleuth`
- 
+
 To install sleuth:
 
 ```{r}
@@ -51,10 +69,13 @@ metadata <- read.csv('../metadata/experiment.csv', stringsAsFactors = FALSE)
 ```
 
 ```{r}
-head(metadata,n = 20)
+head(metadata, n = 20)
 ```
 
-This file describes the experimental design. The first column lists the short read archive accession for each sample that is part of the experiment to be analayzed. The biological condition is recorded in the "strain" column. The last two columns describe how the sequencing was undertaken and reveal that certain batches were sequenced together.
+This file describes the experimental design.
+The first column lists the short read archive accession for each sample that is part of the experiment to be analayzed.
+The biological condition is recorded in the "strain" column.
+The last two columns describe how the sequencing was undertaken and reveal that certain batches were sequenced together.
 
 ```{r}
 extract_metadata <- function(library_name) {
@@ -76,9 +97,10 @@ Finally, we add the path names of the kallisto output directories to the metadat
 
 ```{r}
 metadata <- dplyr::mutate(metadata,
-  path = file.path('', 'results', 'single', run_accession, 'kallisto'))
+  path = file.path('..', 'results', run_accession, 'kallisto'))
 head(metadata)
 ```
+
 It is important to spot check the metadata file again to make sure that the kallisto runs correspond to the accession numbers in the table, so that each row is associated with the correct sample.
 
 ```{r}
@@ -87,9 +109,12 @@ metadata <- dplyr::rename(metadata, sample = run_accession)
 
 ## Associating transcripts to genes
 
-The sample quantifications performed by kallisto have produced transcript abundance and count estimates. These have been parsed by sleuth in the steps just performed, however sleuth does not "know" about genes yet. To perform gene-level analysis sleuth must parse a gene annotation. One easy way to do this is using biomaRt and Ensembl:
+The sample quantifications performed by kallisto have produced transcript abundance and count estimates.
+These have been parsed by sleuth in the steps just performed, however sleuth does not "know" about genes yet.
+To perform gene-level analysis sleuth must parse a gene annotation.
+One easy way to do this is using biomaRt and Ensembl:
 
-```{r}
+```{r cache=TRUE}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
   dataset = "mmusculus_gene_ensembl",
   host = "dec2015.archive.ensembl.org")
@@ -104,23 +129,36 @@ ttg <- dplyr::rename(ttg, target_id = ensembl_transcript_id,
 head(ttg)
 ```
 
-The resulting table contains Ensembl gene names (column 3) and the associated transcripts (column 1). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto. In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.
+The resulting table contains Ensembl gene names (column 3) and the associated transcripts (column 1). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto.
+In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.
 
-## Preparing the analysis
+# Preparing the analysis
 
 ```{r}
 # TODO: temporary -- remove
 metadata <- dplyr::filter(metadata, sample != 'SRR099223')
 ```
 
-```{r}
+The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed: 
+
+```{r cache=TRUE}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
-## The naïve analysis
+Notice the warning: "518 target_ids are missing annotations for the aggregation_column: ens_gene."
+This means that there are transcripts that do not have a gene mapping.
+This is pretty common in most annotations.
+However, if this number is very high, it is advisable to consider using another transcript-to-gene mapping or another annotation.
 
-As discussed in the Trapnell _et al_. walkthough, to identify genes differential between two conditions two models must be fit by sleuth. The first is known as the reduced model, and in this case we name the "intercept model". It fits a single parameter for each gene thereby enforcing equal abundances between conditions. The second model is known as the full model, and it includes a parameter that is strain dependent. We call it the "strain model". With the likelihood ratio test sleuth identifies genes whose abundances are significantly better explained when strain is taken into account. The mechanics of the fitting are: 
+# The naïve analysis
+
+As discussed in the Trapnell _et al_. walkthough, to identify genes differential between two conditions two models must be fit by sleuth.
+The first is known as the reduced model, and in this case we name the "intercept model".
+It fits a single parameter for each gene thereby enforcing equal abundances between conditions.
+The second model is known as the full model, and it includes a parameter that is strain dependent.
+We call it the "strain model".
+With the likelihood ratio test sleuth identifies genes whose abundances are significantly better explained when strain is taken into account. The mechanics of the fitting are:
 
 ```{r}
 so <- sleuth_fit(so, ~1, 'intercept')
@@ -133,18 +171,27 @@ so <- sleuth_lrt(so, 'intercept', 'strain')
 ```
 
 Significantly differential genes are extracted with the commands
+
 ```{r}
 sleuth_table_strain <- sleuth_results(so, 'intercept:strain', 'lrt', show_all = FALSE)
 sleuth_significant_strain <- dplyr::filter(sleuth_table_strain, qval <= 0.05)
 ```
 
-The most significant genes are
+The most significantly differential genes are
 
 ```{r}
-head(sleuth_significant_strain,20)
+head(sleuth_significant_strain, 20)
 ```
 
-A (poor) analysis might end here, but a principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
+Gene abundances can be viewed to confirm the differential analysis:
+
+```{r}
+plot_bootstrap(so,"ENSMUSG00000066553",units="scaled_reads_per_base",color_by = "strain", x_axis_angle = 50)
+```
+
+
+
+However visualization of gene abundances is not sufficient to fully quality control an experiment. A principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
 
 ```{r}
 plot_pca(so, color_by = 'strain')
@@ -156,9 +203,9 @@ The source of the clustering is revealed by coloring the samples by "lane" inste
 plot_pca(so, color_by = 'lane')
 ```
 
-This batch effect is problematic, as genes might be identified as differential in the strain analysis merely because they were sequenced on different lanes. 
+This batch effect is problematic, as genes might be identified as differential in the strain analysis merely because they were sequenced on different lanes.
 
-## Batch analysis
+# Batch analysis
 
 To test whether this is in fact the case, the test described above can be repeated with the full model comprising a paramter for "lane" instead of "strain".
 
@@ -167,15 +214,17 @@ so <- sleuth_fit(so, ~lane, 'lane')
 ```
 
 The likelihood ratio test is performed as before except with the lane model
+
 ```{r}
 so <- sleuth_lrt(so, 'intercept', 'lane')
 ```
 
 The differential analysis test now reveals genes most affected by batch:
+
 ```{r}
 sleuth_table_lane <- sleuth_results(so, 'intercept:lane', 'lrt', show_all = FALSE)
 sleuth_significant_lane <- dplyr::filter(sleuth_table_lane, qval <= 0.05)
-head(sleuth_significant_lane,20)
+head(sleuth_significant_lane, 20)
 ```
 
 To identify genes that are truly differential between strain, it is therefore necessary to fit and account for the (lane) batch effect.
@@ -188,48 +237,19 @@ To account for batch while testing for strain differences, the full model must i
 so <- sleuth_fit(so, ~lane + strain, 'full')
 ```
 
-The reduced model must still include a parameter for the lane. In this way, the strain differences are accounted for while conditioning on the lane. This model, the "lane model" has already been fit. So the likelihood ratio test can now be applied as before:
+The reduced model must still include a parameter for the lane.
+In this way, the strain differences are accounted for while conditioning on the lane.
+This model, the "lane model" has already been fit.
+So the likelihood ratio test can now be applied as before:
 
 ```{r}
 so <- sleuth_lrt(so, 'lane', 'full')
 sleuth_table <- sleuth_results(so, 'lane:full', 'lrt', show_all = FALSE)
 sleuth_significant <- dplyr::filter(sleuth_table, qval <= 0.05)
-head(sleuth_significant,20)
+head(sleuth_significant, 20)
 ```
 
-While the top 8 genes are the same as in the naïve analysis, differences start to emerge afterwards. Furthermore, the top genes emerge as more significantly differential when conditioning on batch. 
+While the top 8 genes are the same as in the naïve analysis, differences start to emerge afterwards.
+Furthermore, the top genes emerge as more significantly differential when conditioning on batch.
 
 
-# Comparing to the microarray data
-
-```{r}
-illumina <- data.table::fread('../results/journal.pone.0017820.s011.TXT',
-  data.table = FALSE)
-```
-
-```{r}
-affymetrix <- data.table::fread('../results/journal.pone.0017820.s010.TXT',
-  data.table = FALSE)
-```
-
-## merging all of the results
-
-```{r}
-illumina <- dplyr::select(illumina, target_id = Ensembl, illumina_qval = q.value)
-affymetrix <- dplyr::select(affymetrix, target_id = Ensembl, affymetrix_qval = q.value)
-```
-
-```{r}
-all_methods <- Reduce(
-  function(x, y) {
-    dplyr::inner_join(x, y, by = 'target_id')
-  },
-  list(
-    dplyr::select(sleuth_table, target_id, with_batch_qval = qval),
-    dplyr::select(strain_only, target_id, without_batch_qval = qval),
-    illumina,
-    affymetrix)
-)
-
-all_methods <- dplyr::distinct(all_methods)
-```

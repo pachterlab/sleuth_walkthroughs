@@ -1,11 +1,18 @@
 ---
-title: "Introduction to sleuth"
-author: "Harold Pimentel, Nicolas Bray, Pall Melsted and Lior Pachter"
-date: "`r Sys.Date()`"
+title: "Getting started with sleuth"
+date: "`r Sys.Date()"
+author:
+- Harold Pimentel
+- Nicolas Bray
+- Páll Melsted
+- Lior Pachter
+
 output:
   html_document:
-    toc: true
+    toc: false
     theme: default
+
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates via an example of conditioning on batch effect."
 ---
 
 ## Overview
