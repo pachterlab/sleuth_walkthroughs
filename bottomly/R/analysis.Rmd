@@ -182,16 +182,15 @@ The most significantly differential genes are
 ```{r}
 head(sleuth_significant_strain, 20)
 ```
-
-Gene abundances can be viewed to confirm the differential analysis:
+To confirm that the differential analysis is working it's important to examine specific genes in detail. For example, the most significantly differential gene that emerges from the analysis above is [ENSMUSG00000066553](http://www.ensembl.org/Mus_musculus/Gene/Summary?g=ENSMUSG00000066553;r=12:24638669-24639010;t=ENSMUST00000140065)(a processed pseudogene), whose abundances in the different samples can be viewed with
 
 ```{r}
 plot_bootstrap(so,"ENSMUSG00000066553",units="scaled_reads_per_base",color_by = "strain", x_axis_angle = 50)
 ```
 
+The plot immediately reveals that the gene is expressed in B6 mice and is off in D2 mice. The boxes around the mean abundance estimate for each gene are computed from the kallisto bootstraps which are proxies for the variation that would be observed in technical replicates.
 
-
-However visualization of gene abundances is not sufficient to fully quality control an experiment. A principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
+However visualization of individual gene abundances is not sufficient to fully quality control an experiment. A principal component analysis (PCA) of the kallisto abundances shows that while the samples appear to be clustered into a few distinct groups, they are not well-separated by strain.
 
 ```{r}
 plot_pca(so, color_by = 'strain')
