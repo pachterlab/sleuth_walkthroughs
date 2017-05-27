@@ -1,6 +1,6 @@
 */results/SRR*
 */*results.zip
-*/analysis.html
+*/R/analysis.html
 analysis_files
 analysis_cache
 .snakemake

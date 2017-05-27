@@ -13,15 +13,14 @@ output:
     toc: false
     theme: default
 
-abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple conditions and covariates."
+abstract: "This walkthrough teaches the use of sleuth for identifying differences in expression between any of a number of multiple conditions."
 ---
 
 # Introduction
 
-The purpose of this walkthrough is to demonstrate the use of __sleuth__ for analaysis of an experiment in which a "control" condition is to be compared to multiple different experimental conditions.
-We illustrate this use case with data from the paper Boj _et al_., [Organoid models of human and mouse ductal pancreatic cancer](http://www.sciencedirect.com/science/article/pii/S009286741401592X), Cell, 2015.
+The purpose of this walkthrough is to demonstrate the use of __sleuth__ for analaysis of an experiment in which it is of interest to identify differences that may exist between any of a number of experimental conditions. We illustrate this use case with data from the paper Boj _et al_., [Organoid models of human and mouse ductal pancreatic cancer](http://www.sciencedirect.com/science/article/pii/S009286741401592X), Cell, 2015.
 One of the experiments the paper describes is RNA-Seq performed on syngenic mice organoids.
-Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT).
+Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT). 
 
 A total of 19 samples were sequenced, according to the following experimental design:
 
@@ -58,11 +57,13 @@ The SRA table contains metadata that is not relevant and it is convenient to sim
 ```{r}
 sample_to_condition <- dplyr::select(sample_to_condition,
   sample = run, sex = Sex_s, genotype = mouse_genotype_s)
+head(sample_to_condition)
+
 ```
 
 ## Associating transcripts to genes
 
-As described in the Bottomly _et al_. tutorial, transcripts are associated to genes with the commands
+As described in the Bottomly _et al_. walkthrough, transcripts are associated to genes with the commands
 
 ```{r cache=TRUE}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
@@ -78,13 +79,14 @@ ttg <- dplyr::rename(ttg, target_id = ensembl_transcript_id,
 head(ttg)
 ```
 
-## creating the sleuth object
+## Creating the sleuth object
 
+The next step is to prepare for differential analysis by creating a sleuth object:
 ```{r}
 sample_ids <- dir(file.path('..', 'results'))
 sample_to_condition <- dplyr::mutate(sample_to_condition,
   path = file.path('..', 'results', sample_ids, 'kallisto'))
-```
+````
 
 ```{r cache=TRUE}
 so <- sleuth_prep(sample_to_condition, ~sex + genotype, target_mapping = ttg,
@@ -93,61 +95,60 @@ so <- sleuth_prep(sample_to_condition, ~sex + genotype, target_mapping = ttg,
 
 # Basic quality control
 
-Before beginning analysis, it is useful to examine the overall structure of the data. The PCA plot below shows the samples and verifies that samples cluster by condition:
+Before beginning analysis, it is useful to examine the overall structure of the data.
 
 ```{r}
 plot_pca(so, color_by = 'genotype')
 ```
 
-Alternatively, samples can be sorted by sex:
-
-```{r}
-plot_pca(so, color_by = 'sex')
-```
-
-We see that there appears to be 1 sample outlier.
-
-We can find this outlier by using the sample name labels in the PCA plot:
+The plot reveals a an outlier. 
+The sample corresponding to the outlier can be identified by using the sample name labels in the PCA plot:
 
 ```{r}
 plot_pca(so, color_by = 'genotype', text_labels = TRUE)
 ```
 
-We see that it is sample `SRR1654638`.
-Unfortunately, there is no information in the `sample_to_condition` table that might indicate why this is an outlier.
-It is quite possible that the outlier is real, but it is also possible that it is an artifact from possible batch effects or other experimental issues.
-In this simple analysis we will remove it.
-In a more complete analysis, you might want to investigate why this sample is like that.
+The outlier sample is `SRR1654638`.
+The outlier can be removed with
 
-In the next step, let's remove it.
-
-# Removing the outlier
 
 ```{r}
 sample_to_condition <- dplyr::filter(sample_to_condition, sample != 'SRR1654638')
 ```
+
+Removal of outliers can greatly improve results, an is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keepin errors. 
+However it is prudent to try to understand _why_ a sample might be an outlier.
+
+TODO: loadings?
+
+Once the sample has been removed it is useful to look at the data again. 
+
 
 ```{r cache=TRUE}
 so <- sleuth_prep(sample_to_condition, ~sex + genotype, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
-We see now that the PCA is much more well-behaved and the separation between genotype is much more clear:
+We see now that the PCA is much more well-behaved and the separation between genotype is evident:
 
 
 ```{r}
 plot_pca(so, color_by = 'genotype', text_labels = TRUE)
 ```
 
-An examination of the MA plot (see Cuffdiff walkthrough) reveals the data to be reasonable well behaved.
+Alternatively, samples can be colored by sex:
+
+```{r}
+plot_pca(so, color_by = 'sex')
+```
+
+
+TODO: An examination of the MA plot (see Cuffdiff walkthrough) reveals the data to be reasonable well behaved.
 
 # Testing for differential genes
 
 The first test we perform is to identify genes that are differently expressed in either the mT or PanIN conditions.
 To do this we first specify a "full" model for sleuth. This model contains parameters that are specific to both sex and condition.
-That is, sleuth models the data as:
-
-[math formula]
 
 To identify differential genes sleuth will compare expression values estimated according to the full model, with those of a reduced model.
 In this case, the reduced model estimates parameters only according to sex.
@@ -176,7 +177,7 @@ TODO: perform comparison to number of hits and top hits
 
 # Testing for sex effects
 
-To understand why te naive analysis is problematic, it is helpful to examine genes that are differ according to sex while conditioning on the experimental condition.
+To understand why the naive analysis is problematic, it is helpful to examine genes that are differ according to sex while conditioning on the experimental condition.
 The commands for performing such a differential analysis are:
 
 ```{r}
