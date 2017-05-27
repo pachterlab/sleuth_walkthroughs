@@ -20,7 +20,7 @@ abstract: "This walkthrough teaches the use of sleuth for identifying difference
 
 The purpose of this walkthrough is to demonstrate the use of __sleuth__ for analaysis of an experiment in which it is of interest to identify differences that may exist between any of a number of experimental conditions. We illustrate this use case with data from the paper Boj _et al_., [Organoid models of human and mouse ductal pancreatic cancer](http://www.sciencedirect.com/science/article/pii/S009286741401592X), Cell, 2015.
 One of the experiments the paper describes is RNA-Seq performed on syngenic mice organoids.
-Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT). 
+Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT).
 
 A total of 19 samples were sequenced, according to the following experimental design:
 
@@ -82,11 +82,12 @@ head(ttg)
 ## Creating the sleuth object
 
 The next step is to prepare for differential analysis by creating a sleuth object:
+
 ```{r}
 sample_ids <- dir(file.path('..', 'results'))
 sample_to_condition <- dplyr::mutate(sample_to_condition,
   path = file.path('..', 'results', sample_ids, 'kallisto'))
-````
+```
 
 ```{r cache=TRUE}
 so <- sleuth_prep(sample_to_condition, ~sex + genotype, target_mapping = ttg,
@@ -101,7 +102,7 @@ Before beginning analysis, it is useful to examine the overall structure of the 
 plot_pca(so, color_by = 'genotype')
 ```
 
-The plot reveals a an outlier. 
+The plot reveals a an outlier.
 The sample corresponding to the outlier can be identified by using the sample name labels in the PCA plot:
 
 ```{r}
@@ -116,12 +117,12 @@ The outlier can be removed with
 sample_to_condition <- dplyr::filter(sample_to_condition, sample != 'SRR1654638')
 ```
 
-Removal of outliers can greatly improve results, an is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keepin errors. 
+Removal of outliers can greatly improve results, an is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keepin errors.
 However it is prudent to try to understand _why_ a sample might be an outlier.
 
 TODO: loadings?
 
-Once the sample has been removed it is useful to look at the data again. 
+Once the sample has been removed it is useful to look at the data again.
 
 
 ```{r cache=TRUE}
