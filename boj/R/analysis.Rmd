@@ -1,7 +1,7 @@
 ---
 title: "Differential analysis with multiple conditions and covariates"
 
-date: "`r Sys.Date()"
+date: "`r Sys.Date()`"
 author:
 - Harold Pimentel
 - Nicolas Bray
@@ -168,7 +168,7 @@ This is done with the commands:
 ```{r}
 so <- sleuth_fit(so, ~genotype, 'genotype')
 so <- sleuth_fit(so, ~1, 'intercept')
-so <- sleuth_fit(so, 'intercept', 'genotype')
+so <- sleuth_lrt(so, 'intercept', 'genotype')
 naive_results <- sleuth_results(so, 'intercept:genotype', 'lrt')
 ```
 

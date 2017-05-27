@@ -4,3 +4,4 @@
 analysis_files
 analysis_cache
 .snakemake
+.Rhistory
