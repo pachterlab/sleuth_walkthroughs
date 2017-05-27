@@ -16,25 +16,26 @@ abstract: "This walkthrough teaches the use of sleuth for analysis of experiment
 
 # Introduction
 
-This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. 
-The example uses data from the paper Bottomly et al., [Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays](TODO), _PLoS One_, 2011. 
-In addition to this walkthrough, data from the paper was is used for some of the [analyses in the sleuth paper](TODO). 
-The specific data that are examined in this walkthrough are 21 RNA-Seq samples from striatal samples extracted from two different mouse strains. 
-The strains are C57BL/6J (B6) and DBA/2J (D2). 
-The Bottomly _et al_. analysis focuses on a comparison of the RNA-Seq gene expression estimates to microarray estimates. 
+This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data.
+The example uses data from the paper Bottomly et al., [Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays](TODO), _PLoS One_, 2011.
+In addition to this walkthrough, data from the paper was is used for some of the [analyses in the sleuth paper](TODO).
+The specific data that are examined in this walkthrough are 21 RNA-Seq samples from striatal samples extracted from two different mouse strains.
+The strains are C57BL/6J (B6) and DBA/2J (D2).
+The Bottomly _et al_. analysis focuses on a comparison of the RNA-Seq gene expression estimates to microarray estimates.
 In this walkthrough we examine in detail how to analyze the RNA-Seq.
 
-The walkthrough is self-contained, but new users to sleuth will benefit from first studying the Trapnell _et al_. walkthrough which demonstrates the use of sleuth on a simple two condition experiment. 
-This walkthrough, in addition to illustrating how to condition on batch effects, provides an example for how to use sleuth for analyses of experimental designs with multiple covariates. 
+The walkthrough is self-contained, but new users to sleuth will benefit from first studying the Trapnell _et al_. walkthrough which demonstrates the use of sleuth on a simple two condition experiment.
+This walkthrough, in addition to illustrating how to condition on batch effects, provides an example for how to use sleuth for analyses of experimental designs with multiple covariates.
 The tutorial also moves beyond the isoform-level analysis of the Trapnell _et al_. walkthrough and illustrates how to perform gene-level analysis.
 
 # Preliminaries
 
-Create a directory for the analysis and start up `R`. 
+Create a directory for the analysis and start up `R`.
 Set the working directory with the `setwd()` command.
 
 Requirements for this walkthrough:
 
+- `cowplot` for making prettier plots and plots with grids. Available in CRAN:  `install.packages('cowplot')`
 - `biomaRt` for extracting the Ensembl transcript to gene mapping. For alternative methods, [please see this walk-through](TODO).
 
 To install the package:
@@ -56,6 +57,7 @@ unzip ../Bottomly_results.zip -d ../results
 To install sleuth:
 
 ```{r}
+library('cowplot')
 library('sleuth')
 ```
 
@@ -139,7 +141,7 @@ In other words, to use Ensembl transcript-gene associations kallisto was run usi
 metadata <- dplyr::filter(metadata, sample != 'SRR099223')
 ```
 
-The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed: 
+The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed:
 
 ```{r cache=TRUE}
 so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
@@ -185,7 +187,8 @@ head(sleuth_significant_strain, 20)
 To confirm that the differential analysis is working it's important to examine specific genes in detail. For example, the most significantly differential gene that emerges from the analysis above is [ENSMUSG00000066553](http://www.ensembl.org/Mus_musculus/Gene/Summary?g=ENSMUSG00000066553;r=12:24638669-24639010;t=ENSMUST00000140065)(a processed pseudogene), whose abundances in the different samples can be viewed with
 
 ```{r}
-plot_bootstrap(so,"ENSMUSG00000066553",units="scaled_reads_per_base",color_by = "strain", x_axis_angle = 50)
+plot_bootstrap(so, "ENSMUSG00000066553",
+  units = "scaled_reads_per_base", color_by = "strain")
 ```
 
 The plot immediately reveals that the gene is expressed in B6 mice and is off in D2 mice. The boxes around the mean abundance estimate for each gene are computed from the kallisto bootstraps which are proxies for the variation that would be observed in technical replicates.
@@ -251,4 +254,66 @@ head(sleuth_significant, 20)
 While the top 8 genes are the same as in the naïve analysis, differences start to emerge afterwards.
 Furthermore, the top genes emerge as more significantly differential when conditioning on batch.
 
+## Comparing the results
 
+This is a simple comparison just to show how the rankings differ.
+
+First, we create a new column for the relative rank within both lists.
+
+```{r}
+tmp <- dplyr::inner_join(
+  dplyr::mutate(
+    dplyr::select(sleuth_significant, target_id, qval_batch = qval),
+    rank_batch = 1:length(qval_batch)),
+  dplyr::mutate(
+    dplyr::select(sleuth_significant_strain, target_id, qval_strain = qval),
+    rank_strain = 1:length(qval_strain))
+  ,
+  by = 'target_id')
+```
+
+Next, we compute the relative difference between the ranks.
+
+```{r}
+tmp <- dplyr::mutate(tmp,
+  relative_difference = abs(rank_batch - rank_strain) / (rank_batch + rank_strain))
+```
+
+Finally, we can plot a few of the top different results:
+
+```{r}
+top_different <- dplyr::arrange(head(tmp, 100), desc(relative_difference))
+p <- lapply(top_different$target_id[1:4],
+  function(x) {
+    plot_bootstrap(so, x, color_by = 'strain')
+  })
+plot_grid(plotlist = p)
+```
+
+## Comparing effect sizes
+
+We can extract all of the parameters using the `extract_model` function by supplying the model name used in the `sleuth_fit` call.
+
+```{r}
+full_model <- extract_model(so, 'full')
+strain_model <- extract_model(so, 'strain')
+```
+
+Next, if we wish to compare the values we can do so.
+Note that these values are conditional on the other parameters being in the model.
+
+```{r}
+effect_sizes <- dplyr::inner_join(
+  dplyr::select(dplyr::filter(full_model, grepl('strain', term)),
+    target_id, full_estimate = estimate),
+  dplyr::select(dplyr::filter(strain_model, grepl('strain', term)),
+    target_id, strain_estimate = estimate),
+  by = 'target_id'
+  )
+dplyr::inner_join(
+  dplyr::select(top_different[1:10, ], target_id),
+  effect_sizes,
+  by = 'target_id')
+```
+
+There is not much to say other than they are different.
