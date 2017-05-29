@@ -18,31 +18,23 @@ abstract: "This walkthrough teaches the use of sleuth for identifying difference
 
 # Introduction
 
-The purpose of this walkthrough is to demonstrate the use of __sleuth__ for analaysis of an experiment in which it is of interest to identify differences that may exist between any of a number of experimental conditions. We illustrate this use case with data from the paper Boj _et al_., [Organoid models of human and mouse ductal pancreatic cancer](http://www.sciencedirect.com/science/article/pii/S009286741401592X), Cell, 2015.
+The purpose of this walkthrough is to demonstrate the use of [__sleuth__](http://pachterlab.github.io/sleuth/) for analaysis of an experiment in which it is of interest to identify differences that may exist between any of a number of experimental conditions. We illustrate this use case with data from the paper Boj _et al_., [Organoid models of human and mouse ductal pancreatic cancer](http://www.sciencedirect.com/science/article/pii/S009286741401592X), Cell, 2015.
 One of the experiments the paper describes is RNA-Seq performed on syngenic mice organoids.
-Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT).
-
-A total of 19 samples were sequenced, according to the following experimental design:
-
-This walkthrough explains how to test for genes differential in _at least_ one of the abnormal samples (PanIN or mT), while conditioning on the sex of the mouse.
+Specifically, RNA was extracted from murine normal (mN), pancreatic tissues that contained low-grade murine PanIN (PanIN) and pancreatic ductal organoids from multiple primary tumors (mT). The goal is to identify genes in _either_ of the PanIN or mT samples that differ in their expression from the control (nN) sample. The walkthrough explains how to setup and perform a test identifying such genes while taking into account the sex of each mouse.
 
 # Preliminaries
 
 Requirements for this tutorial:
 
-- knowledge of how to use sleuth for simple two condition experiments (see [link here])
+- knowledge of [how to use sleuth for simple two condition experiments](https://pachterlab.github.io/sleuth/walkthroughs/trapnell).
 - __kallisto__ quantified samples from GEO GSE63348 (SRA SRP049959).
+- the short read archive (SRA) runtable that contains accessions for the samples analyzed and associates metadata to them. [Download here](https://raw.githubusercontent.com/pachterlab/sleuth_walkthroughs/master/boj/metadata/SraRunTable.txt).
+
+To facilitate practice with the walkthrough we have made kallisto pseudoalignments for the samples available here:
 
 ```{bash eval=FALSE}
 wget -O ../Boj_results.zip 'https://www.dropbox.com/s/8swoeu94candjxd/Boj_results.zip?dl=1'
 unzip ../Boj_results.zip -d ../results
-```
-
-- the SRA runtable. [Download here](https://raw.githubusercontent.com/pachterlab/sleuth_walkthroughs/master/boj/metadata/SraRunTable.txt).
-
-
-```{r}
-library('sleuth')
 ```
 
 The SRA runtable looks like this:
@@ -52,7 +44,7 @@ sample_to_condition <- read.table('../metadata/SraRunTable.txt', header = TRUE,
 head(sample_to_condition)
 ```
 
-The SRA table contains metadata that is not relevant and it is convenient to simplify it with
+Some of the metadata that is not relevant and it is convenient to simplify the table
 
 ```{r}
 sample_to_condition <- dplyr::select(sample_to_condition,
@@ -61,9 +53,15 @@ head(sample_to_condition)
 
 ```
 
+Finally, __sleuth__ is loaded with
+
+```{r}
+library('sleuth')
+```
+
 ## Associating transcripts to genes
 
-As described in the Bottomly _et al_. walkthrough, transcripts are associated to genes with the commands
+To conform with the analyses in Boj _et al_., the walkthrough demonstrates analysis at the gene-level. Transcripts are associated to genes with the commands
 
 ```{r cache=TRUE}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
@@ -81,12 +79,12 @@ head(ttg)
 
 ## Creating the sleuth object
 
-The next step is to prepare for differential analysis by creating a sleuth object:
-
 ```{r}
 # TODO: temporary. remove after zip file is fixed
 sample_to_condition <- dplyr::filter(sample_to_condition, sample != "SRR1654626")
 ```
+
+The next step is to prepare for differential analysis by creating a sleuth object:
 
 ```{r}
 sample_ids <- dir(file.path('..', 'results'))
@@ -115,36 +113,40 @@ plot_pca(so, color_by = 'genotype', text_labels = TRUE)
 ```
 
 The outlier sample is `SRR1654638`.
+
+Removal of outliers can greatly improve results, and is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keeping errors/sample mix-ups. 
+However removing outliers can also accidentally, if not intentionally, become a form of data fishing.
+
+Therefore before removing outliers it is prudent to try to understand _why_ a sample might be an outlier. To do so it is helpful to examine the PCA loadings, i.e. the primary genes whose linear combinations define the principal components:
+
+```{r}
+plot_loadings(so, pc_input = 1)
+```
+
+The first gene driving PC1 is
+
+```{r}
+plot_bootstrap(so, 'ENSMUSG00000096887', color_by = 'genotype')
+```
+
+The gene is highly expressed and is variable between samples, but the outlier sample does not appear to be particularly different than the other samples. However the second gene influencing PC1 reveals the source of variation causing sample SRR1654638 to be an outlier.  
+
+```{r}
+plot_bootstrap(so, 'ENSMUSG00000035202', color_by = 'genotype')
+```
+
+Sample SRR1654638 is markedly different from all of the other samples.
+Looking it up at [Ensembl](http://www.ensembl.org/Mus_musculus/Gene/Summary?g=ENSMUSG00000035202;r=9:123366927-123462666) reveals that it is a mitochondrial gene.
+This could be investigated further, for example by detailed analyses of alignments to mitochondrial genes; we leave the further investigation of the nature of the sample as an exercise for the reader.
+
 The outlier can be removed with
 
 ```{r}
 sample_to_condition <- dplyr::filter(sample_to_condition, sample != 'SRR1654638')
 ```
 
-Removal of outliers can greatly improve results, an is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keepin errors.
-However it is prudent to try to understand _why_ a sample might be an outlier.
-
-```{r}
-plot_loadings(so, pc_input = 1)
-```
-
-Let's look at the first two genes driving PC 1.
-
-```{r}
-plot_bootstrap(so, 'ENSMUSG00000096887', color_by = 'genotype')
-```
-
-Looks highly expressed, but the outlier sample doesn't appear to be particularly crazy here.
-
-```{r}
-plot_bootstrap(so, 'ENSMUSG00000035202', color_by = 'genotype')
-```
-
-Here we notice that the expression in sample SRR1654638 is wildly different from all of the other samples.
-Looking it up at [Ensembl](http://www.ensembl.org/Mus_musculus/Gene/Summary?g=ENSMUSG00000035202;r=9:123366927-123462666) we notice that it is a mitochondrial gene.
-This could be investigated further, for example by further analyses of alignments to mitochondrial genes; we leave the investigation of the nature of the contamination of the sample as an exercise for the reader.
-
-Once the sample has been removed it is useful to look at the data again.
+Once the sample has been removed it is useful to re-examine the data at a high level.
+The first two principal components shown in the PCA plot now reveal a better behaved experiment and the separation between genotype is evident:
 
 
 ```{r cache=TRUE}
@@ -152,21 +154,15 @@ so <- sleuth_prep(sample_to_condition, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
-We see now that the PCA is much more well-behaved and the separation between genotype is evident:
-
-
 ```{r}
 plot_pca(so, color_by = 'genotype', text_labels = TRUE)
 ```
 
-Alternatively, samples can be colored by sex:
+It is useful to examine the data with respect to different covariates as well; coloring by sex is shown below:
 
 ```{r}
 plot_pca(so, color_by = 'sex')
 ```
-
-
-TODO: An examination of the MA plot (see Cuffdiff walkthrough) reveals the data to be reasonable well behaved.
 
 # Testing for differential genes
 
@@ -187,27 +183,7 @@ so <- sleuth_lrt(so, 'genotype', 'full')
 full_results <- sleuth_results(so, 'genotype:full', 'lrt', show_all = FALSE)
 ```
 
-# Comparison with a naive analysis
+A comparison with the naíve analysis as demonstrated in the [Bottomly _et al_. walkthrough](http://pachterlab.github.io/sleuth/walkthroughs/bottomly/) is intructive to perform here as well; we omit the details as they are already demonstrated in the Bottomly _et al_. walkthrough. 
 
-A naive analysis of the data would be to ignore the sex of each mouse, and to just test for differences among conditions.
-This is done with the commands:
-
-```{r}
-so <- sleuth_fit(so, ~1, 'intercept')
-so <- sleuth_lrt(so, 'intercept', 'genotype')
-naive_results <- sleuth_results(so, 'intercept:genotype', 'lrt', show_all = FALSE)
-```
-
-TODO: perform comparison to number of hits and top hits
-
-# Testing for sex effects
-
-To understand why the naive analysis is problematic, it is helpful to examine genes that are differ according to sex while conditioning on the experimental condition.
-The commands for performing such a differential analysis are:
-
-```{r}
-so <- sleuth_lrt(so, 'genotype', 'full')
-sex_results <- sleuth_results(so, 'genotype:full', 'lrt')
-```
-
-Evidently, genes such as [..] which emerge as significantly different in the naive analysis, reveal difference in sex rather than condition.
+Instead, the walkthrough is concluded by a comparison to the anlaysis of the Boj _et al_. paper which (a) did not remove the outlier and (b) did not test with respect to sex.
+The most significant gene in the sleuth analysis is:
