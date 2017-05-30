@@ -11,10 +11,10 @@ output:
     toc: false
     theme: default
 
-abstract: "This walkthrough is an introduction to the use of sleuth for differential expression analysis. It teaches the use of sleuth for analysis of an experiment with two conditions"
+abstract: "This walkthrough is an introduction to the use of sleuth for differential expression analysis."
 ---
 
-## Overview
+## Introduction
 
 __sleuth__ is a tool for the analysis and comparison of multiple related RNA-Seq experiments. Key features include:
 
@@ -27,27 +27,20 @@ To use __sleuth__, RNA-Seq data must first be quantified with [__kallisto__](htt
 An important feature of __kallisto__ is that it outputs bootstraps along with the estimates of transcript abundances.
 These can serve as proxies for technical replicates, allowing for an ascertainment of the variability in estimates due to the random processes underlying RNA-Seq as well as the statistical procedure of read assignment.
 __kallisto__ can quantify 30 million human reads in less than 3 minutes on a Mac desktop computer using only the read sequences and a transcriptome index that itself takes less than 10 minutes to build.
-__sleuth__ has also been designed to be lightweight and fast, and therefore RNA-Seq analysis with __kallisto__ and  __sleuth__ is tractable on a laptop computer in a matter of minutes.
+__sleuth__ has been designed to work seamlessly and efficiently with kallisto, and therefore RNA-Seq analysis with __kallisto__ and  __sleuth__ is tractable on a laptop computer in a matter of minutes.
 More details about __kallisto__ and __sleuth__ are provided the papers describing the methods:
 
 - Nicolas L Bray, Harold Pimentel, Páll Melsted and Lior Pachter, [Near-optimal probabilistic RNA-seq quantification](http://www.nature.com/nbt/journal/v34/n5/full/nbt.3519.html), Nature Biotechnology **34**, 525–527 (2016), doi:10.1038/nbt.3519
 
-* sleuth paper
+* Harold Pimentel, Nicolas L Bray, Suzette Puente, Páll Melsted and Lior Pachter, [Differential analysis of RNA-seq incorporating quantification uncertainty](), Nature Methods **14**, (2017), doi:
 
 __sleuth__ has been designed to facilitate the exploration of RNA-Seq data by utilizing the [Shiny](http://shiny.rstudio.com) web application framework by RStudio.
 The worked example below illustrates how to load data into __sleuth__ and how to open Shiny plots for exploratory data analysis.
 The code underlying all plots is available via the Shiny interface so that analyses can be fully "open source".
 
-
-Next load __sleuth__ with
-
-```{r}
-library("sleuth")
-```
-
 ## Preliminaries
 
-To explain how to use __sleuth__ we provide an example based on the data in the "Cuffdiff2 paper":
+This walkthrough is based on the data in the "Cuffdiff2 paper":
 
 * [Differential analysis of gene regulation at transcript resolution with RNA-seq](http://www.nature.com/nbt/journal/v31/n1/full/nbt.2450.html)	by Cole Trapnell, David G Henderickson, Martin Savageau, Loyal Goff, John L Rinn and Lior Pachter, Nature Biotechnology __31__, 46--53 (2013).
 
@@ -63,10 +56,14 @@ wget -O ../Trapnell_results.zip 'https://www.dropbox.com/s/eqx3jmylgns4wd3/Trapn
 unzip ../Trapnell_results.zip -d ..
 ```
 
-The first step in a __sleuth__ analysis is to specify where the __kallisto__ results are stored. Begin by storing the base directory of the results in a variable,
+Once the kallisto quantifications have been obtained, the analysis shifts to R and begins with loading __sleuth__:
 
+```{r}
+library("sleuth")
+```
 
-Next get the list of sample IDs with
+The first step in a __sleuth__ analysis is to specify where the __kallisto__ results are stored.
+A variable is created for this purpose with
 
 ```{r}
 sample_id <- dir(file.path("..", "results"))
@@ -95,22 +92,22 @@ s2c <- dplyr::select(s2c, sample = run_accession, condition)
 s2c
 ```
 
-Now, we must enter the directories into a column in the table describing the experiment.
-This column must be labeled `path`, otherwise sleuth will throw an error.
-This is to ensure that the user can check which samples correspond to which kallisto runs.
+Now the directories must be appended in a new column to the table describing the experiment.
+This column must be labeled `path`, otherwise sleuth will report an error.
+This is to ensure that samples can be associated with kallisto quantifications.
 
 ```{r}
 s2c <- dplyr::mutate(s2c, path = kal_dirs)
 ```
 
-The user should check whether or not the order is correct.
-In this case, the kallisto output is correctly matched with the sample identifiers.
+It is important to check that the pairings are correct:
 
 ```{r}
 print(s2c)
 ```
 
-Now the "sleuth object" can be constructed. This requires four commands that (1) load the kallisto processed data into the object (2) estimate parameters for the __sleuth__ response error measurement (full) model (3) estimate parameters for the __sleuth__ reduced model, and (4) perform differential analysis (testing). On a laptop the four steps should take about a few minutes altogether.
+Next, the "sleuth object" can be constructed. This object will store not only the information about the experiment, but also details of the model to be used for differential testing, and the results. 
+It is prepared and used with four commands that (1) load the kallisto processed data into the object (2) estimate parameters for the __sleuth__ response error measurement (full) model (3) estimate parameters for the __sleuth__ reduced model, and (4) perform differential analysis (testing). On a laptop the four steps should take about a few minutes altogether.
 
 First type
 
@@ -121,27 +118,44 @@ so <- sleuth_prep(s2c)
 then fit the full model
 
 ```{r cache=TRUE}
-so <- sleuth_fit(so, ~ condition, 'full')
+so <- sleuth_fit(so, ~condition, 'full')
 ```
 
-Next, we fit the reduced model.
-In this case, the reduced model is the intercept-only model:
+What this has accomplished is to "smooth" the raw kallisto abundance estimates for each sample using a linear model with a parameter that represents the experimental condition (in this case scramble vs. HOXA1KD).
+To test for transcripts that are differential expressed between the conditions, sleuth performs a second fit to a model that presumes abundances are equal in the two conditions. 
+To identify differential expressed transcripts sleuth will then identify transcripts with a significantly better fit with the "full" model.
+
+The "reduced" model is fit with
 
 ```{r cache=TRUE}
 so <- sleuth_fit(so, ~1, 'reduced')
 ```
 
-and finally perform the test:
+and the test is performed with
 
 ```{r}
 so <- sleuth_lrt(so, 'reduced', 'full')
 ```
 
-In general, we can test models that are nested using the likelihood ratio test.
-Viewing models which have been fit can be done using the `models()` function.
+In general, sleuth can utilize the likelihood ratio test with any pair of models that are nested, and other walkthroughs illustrate the power of such a framework for accounting for batch effects and more complex experimental designs. 
+
+The models that have been fit can always be examined with the `models()` function.
 
 ```{r}
 models(so)
+```
+
+The results of the test can be examined with
+```{r}
+sleuth_table <- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE)
+sleuth_significant <- dplyr::filter(sleuth_table, qval <= 0.05)
+head(sleuth_significant, 20)
+```
+
+The table shown above displays the top 20 significant genes with a (Benjamini-Hochberg multiple testing corrected) q-value <= 0.05.
+
+```{r}
+plot_bootstrap(so, "ENST00000263734", units = "est_counts", color_by = "condition")
 ```
 
 ### Including gene names into transcript-level analysis
@@ -149,7 +163,7 @@ models(so)
 At this point the sleuth object constructed from the kallisto runs has information about the data, the experimental design, the __kallisto__ estimates, the model fit, and the testing.
 In other words it contains the entire analysis of the data.
 There is, however, one piece of information that can be useful to add in, but that is optional.
-In reading the kallisto output __sleuth__ has no information about _genes_, but this can be added allowing for searching and analysis by gene instead of transcript.
+In reading the kallisto output __sleuth__ has no information about the _genes_ transcripts are associated with, but this can be added allowing for searching and analysis of significantly differential transcripts by their associated gene names.
 
 Since the example was constructed with the ENSEMBL human transcriptome, we will add gene names from ENSEMBL using biomaRt (there are other ways to do this as well):
 
@@ -183,38 +197,14 @@ so <- sleuth_lrt(so, 'reduced', 'full')
 
 This addition of metadata to transcript IDs is very general, and can be used to add in other information.
 
-The easiest way to view the results is to generate the Shiny webpage that allows for exploratory data analysis:
+The easiest way to view and interact with the results is to generate the Shiny webpage that allows for exploratory data analysis:
 
 ```{r eval=FALSE}
 sleuth_live(so)
 ```
 
-To generate a table of results for analysis within R type
-
-```{r}
-results_table <- sleuth_results(so, 'reduced:full', test_type = 'lrt')
-```
-
-A common plot that people make for exploratory analysis is a PCA plot:
-
+Among the tables and visualizations that can be explored with sleuth_live are a number of plots that provide an overview of the experiment. For example, a PCA plot of the samples:
 ```{r}
 plot_pca(so, color_by = 'condition')
 ```
 
-### Gene level analysis
-
-Assuming `biomaRt` has been installed as in the previous step, sleuth can also be run in the 'gene aggregation' mode.
-In addition to requiring a `target_mapping`, a string which references a column to aggregate by, (`aggregation_column`).
-In our example, we could use `ens_gene` or `ext_gene`.
-It is preferable to use `ens_gene` as `ext_gene` tends to be a bit redundant.
-
-We can also run it with more than 1 processor by specifying `num_cores`.
-The modified sleuth prep command looks as follows:
-
-```{r}
-so <- sleuth_prep(s2c, ~condition, target_mapping = t2g,
-  aggregation_column = 'ens_gene', num_cores = 3)
-```
-
-The remainder of the pipeline is unchanged.
-When running `sleuth_live` or `sleuth_results`, the gene column you selected will be listed as `target_id`, rather than the transcript name.
