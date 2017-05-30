@@ -23,35 +23,24 @@ __sleuth__ is a tool for the analysis and comparison of multiple related RNA-Seq
 - The use of boostraps to ascertain and correct for technical variation in experiments.
 - An interactive app for exploratory data analysis.
 
-To use __sleuth__, RNA-Seq data must first be quantified with [__kallisto__](http://pachterlab.github.io/kallisto/), which is a program for _very_ fast RNA-Seq quantification based on pseudo-alignment. An important feature of __kallisto__ is that it outputs bootstraps along with the estimates of transcript abundances. These can serve as proxies for technical replicates, allowing for an ascertainment of the variability in estimates due to the random processes underlying RNA-Seq as well as the statistical procedure of read assignment. __kallisto__ can quantify 30 million human reads in less than 3 minutes on a Mac desktop computer using only the read sequences and a transcriptome index that itself takes less than 10 minutes to build. __sleuth__ has also been designed to be lightweight and fast, and therefore RNA-Seq analysis with __kallisto__ and  __sleuth__ is tractable on a laptop computer in a matter of minutes. More details about __kallisto__ and __sleuth__ are provided the papers describing the methods:
+To use __sleuth__, RNA-Seq data must first be quantified with [__kallisto__](http://pachterlab.github.io/kallisto/), which is a program for _very_ fast RNA-Seq quantification based on pseudo-alignment.
+An important feature of __kallisto__ is that it outputs bootstraps along with the estimates of transcript abundances.
+These can serve as proxies for technical replicates, allowing for an ascertainment of the variability in estimates due to the random processes underlying RNA-Seq as well as the statistical procedure of read assignment.
+__kallisto__ can quantify 30 million human reads in less than 3 minutes on a Mac desktop computer using only the read sequences and a transcriptome index that itself takes less than 10 minutes to build.
+__sleuth__ has also been designed to be lightweight and fast, and therefore RNA-Seq analysis with __kallisto__ and  __sleuth__ is tractable on a laptop computer in a matter of minutes.
+More details about __kallisto__ and __sleuth__ are provided the papers describing the methods:
 
-* kallisto paper 
+- Nicolas L Bray, Harold Pimentel, Páll Melsted and Lior Pachter, [Near-optimal probabilistic RNA-seq quantification](http://www.nature.com/nbt/journal/v34/n5/full/nbt.3519.html), Nature Biotechnology **34**, 525–527 (2016), doi:10.1038/nbt.3519
 
 * sleuth paper
 
-__sleuth__ has been designed to facilitate the exploration of RNA-Seq data by utilizing the [Shiny](http://shiny.rstudio.com) web application framework by RStudio. The worked example below illustrates how to load data into __sleuth__ and how to open Shiny plots for exploratory data analysis. The code underlying all plots is available via the Shiny interface so that analyses can be fully "open source".
+__sleuth__ has been designed to facilitate the exploration of RNA-Seq data by utilizing the [Shiny](http://shiny.rstudio.com) web application framework by RStudio.
+The worked example below illustrates how to load data into __sleuth__ and how to open Shiny plots for exploratory data analysis.
+The code underlying all plots is available via the Shiny interface so that analyses can be fully "open source".
 
-## Installation
-
-To install __sleuth__ start [R](https://www.r-project.org) and first install `rhdf5` by typing:
-
-```{r eval=FALSE}
-source("http://bioconductor.org/biocLite.R")
-biocLite("rhdf5")
-```
-
-Then install devtools by typing
-
-```{r eval=FALSE}
-install.packages("devtools")
-```
-
-and install __sleuth__ by typing
-```{r eval=FALSE}
-devtools::install_github("pachterlab/sleuth")
-```
 
 Next load __sleuth__ with
+
 ```{r}
 library("sleuth")
 ```
@@ -62,33 +51,46 @@ To explain how to use __sleuth__ we provide an example based on the data in the 
 
 * [Differential analysis of gene regulation at transcript resolution with RNA-seq](http://www.nature.com/nbt/journal/v31/n1/full/nbt.2450.html)	by Cole Trapnell, David G Henderickson, Martin Savageau, Loyal Goff, John L Rinn and Lior Pachter, Nature Biotechnology __31__, 46--53 (2013).
 
-The human fibroblast RNA-Seq data for the paper is available on GEO at accession [GSE37704](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE37704). The samples to be analyzed are the six samples LFB_scramble_hiseq_repA, LFB_scramble_hiseq_repB, LFB_scramble_hiseq_repC, LFB_HOXA1KD_hiseq_repA, LFB_HOXA1KD_hiseq_repA, and LFB_HOXA1KD_hiseq_repC. These are three biological replicates in each of two conditions (scramble and HoxA1 knockdown) that will be compared with __sleuth__.
+The human fibroblast RNA-Seq data for the paper is available on GEO at accession [GSE37704](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE37704).
+The samples to be analyzed are the six samples LFB_scramble_hiseq_repA, LFB_scramble_hiseq_repB, LFB_scramble_hiseq_repC, LFB_HOXA1KD_hiseq_repA, LFB_HOXA1KD_hiseq_repA, and LFB_HOXA1KD_hiseq_repC.
+These are three biological replicates in each of two conditions (scramble and HoxA1 knockdown) that will be compared with __sleuth__.
 
-To analyze the data, first download the raw reads, install __kallisto__ and then quantify the data with boostraps as described [here](http://pachterlab.github.io/kallisto/starting.html). This step can be skipped for the purposes of the vignette, by downloading the __kallisto__ processed data directly by clicking [here](http://bio.math.berkeley.edu/sleuth/cuffdiff2/cuffdiff2_data_kallisto_results.zip).
+To analyze the data, first download the raw reads, install __kallisto__ and then quantify the data with boostraps as described [here](http://pachterlab.github.io/kallisto/starting.html).
+This step can be skipped for the purposes of the vignette, by downloading the __kallisto__ processed data directly by clicking [here](http://bio.math.berkeley.edu/sleuth/cuffdiff2/cuffdiff2_data_kallisto_results.zip).
+
+```{bash eval=FALSE}
+wget -O ../Trapnell_results.zip 'https://www.dropbox.com/s/eqx3jmylgns4wd3/Trapnell_results.zip?dl=1'
+unzip ../Trapnell_results.zip -d ..
+```
 
 The first step in a __sleuth__ analysis is to specify where the __kallisto__ results are stored. Begin by storing the base directory of the results in a variable,
-```{r}
-base_dir <- "../results/cuffdiff2_data_kallisto_results"
-```
+
+
 Next get the list of sample IDs with
+
 ```{r}
-sample_id <- dir(file.path(base_dir,"results"))
+sample_id <- dir(file.path("..", "results"))
 ```
+
 The result can be displayed by typing
+
 ```{r}
 sample_id
 ```
+
 In the box above, lines beginning with ## show the output of the command (in what follows we include the output that should appear with each command).
 
 A list of paths to the __kallisto__ results indexed by the sample IDs is collated with
+
 ```{r}
-kal_dirs <- sapply(sample_id, function(id) file.path(base_dir, "results", id, "kallisto"))
+kal_dirs <- file.path("..", "results", sample_id, "kallisto")
 kal_dirs
 ```
 
 The next step is to load an auxillary table that describes the experimental design and the relationship between the kallisto directories and the samples:
+
 ```{r}
-s2c <- read.table(file.path(base_dir, "hiseq_info.txt"), header = TRUE, stringsAsFactors=FALSE)
+s2c <- read.table(file.path("..", "metadata", "hiseq_info.txt"), header = TRUE, stringsAsFactors=FALSE)
 s2c <- dplyr::select(s2c, sample = run_accession, condition)
 s2c
 ```
@@ -112,39 +114,42 @@ Now the "sleuth object" can be constructed. This requires four commands that (1)
 
 First type
 
-```{r eval=TRUE}
-so <- sleuth_prep(s2c, ~ condition)
+```{r cache=TRUE}
+so <- sleuth_prep(s2c)
 ```
 
 then fit the full model
 
-```{r eval=TRUE}
-so <- sleuth_fit(so)
+```{r cache=TRUE}
+so <- sleuth_fit(so, ~ condition, 'full')
 ```
 
 Next, we fit the reduced model.
 In this case, the reduced model is the intercept-only model:
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_fit(so, ~1, 'reduced')
 ```
 
 and finally perform the test:
 
-```{r eval=TRUE}
+```{r}
 so <- sleuth_lrt(so, 'reduced', 'full')
 ```
 
 In general, we can test models that are nested using the likelihood ratio test.
 Viewing models which have been fit can be done using the `models()` function.
 
-```{r eval=TRUE}
+```{r}
 models(so)
 ```
 
 ### Including gene names into transcript-level analysis
 
-At this point the sleuth object constructed from the kallisto runs has information about the data, the experimental design, the __kallisto__ estimates, the model fit, and the testing. In other words it contains the entire analysis of the data. There is, however, one piece of information that can be useful to add in, but that is optional. In reading the kallisto output __sleuth__ has no information about _genes_, but this can be added allowing for searching and analysis by gene instead of transcript.
+At this point the sleuth object constructed from the kallisto runs has information about the data, the experimental design, the __kallisto__ estimates, the model fit, and the testing.
+In other words it contains the entire analysis of the data.
+There is, however, one piece of information that can be useful to add in, but that is optional.
+In reading the kallisto output __sleuth__ has no information about _genes_, but this can be added allowing for searching and analysis by gene instead of transcript.
 
 Since the example was constructed with the ENSEMBL human transcriptome, we will add gene names from ENSEMBL using biomaRt (there are other ways to do this as well):
 
@@ -157,30 +162,30 @@ biocLite("biomaRt")
 
 Then collect gene names with
 
-```{r eval=TRUE}
+```{r cache=TRUE}
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
   dataset = "hsapiens_gene_ensembl",
   host = 'ensembl.org')
-```
-
-and add them into the __sleuth__ table with
-
-```{r, eval=TRUE}
 t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id",
     "external_gene_name"), mart = mart)
 t2g <- dplyr::rename(t2g, target_id = ensembl_transcript_id,
   ens_gene = ensembl_gene_id, ext_gene = external_gene_name)
-so <- sleuth_prep(s2c, ~ condition, target_mapping = t2g)
-so <- sleuth_fit(so)
+```
+
+and add them into the __sleuth__ table with
+
+```{r cache=TRUE}
+so <- sleuth_prep(s2c, target_mapping = t2g)
+so <- sleuth_fit(so, ~condition, 'full')
 so <- sleuth_fit(so, ~1, 'reduced')
 so <- sleuth_lrt(so, 'reduced', 'full')
 ```
 
 This addition of metadata to transcript IDs is very general, and can be used to add in other information.
 
-The best way to view the results is to generate the Shiny webpage that allows for exploratory data analysis:
+The easiest way to view the results is to generate the Shiny webpage that allows for exploratory data analysis:
 
-```{r, eval=FALSE}
+```{r eval=FALSE}
 sleuth_live(so)
 ```
 
@@ -190,6 +195,12 @@ To generate a table of results for analysis within R type
 results_table <- sleuth_results(so, 'reduced:full', test_type = 'lrt')
 ```
 
+A common plot that people make for exploratory analysis is a PCA plot:
+
+```{r}
+plot_pca(so, color_by = 'condition')
+```
+
 ### Gene level analysis
 
 Assuming `biomaRt` has been installed as in the previous step, sleuth can also be run in the 'gene aggregation' mode.
@@ -197,23 +208,13 @@ In addition to requiring a `target_mapping`, a string which references a column 
 In our example, we could use `ens_gene` or `ext_gene`.
 It is preferable to use `ens_gene` as `ext_gene` tends to be a bit redundant.
 
+We can also run it with more than 1 processor by specifying `num_cores`.
 The modified sleuth prep command looks as follows:
 
 ```{r}
 so <- sleuth_prep(s2c, ~condition, target_mapping = t2g,
-  aggregation_column = 'ens_gene')
+  aggregation_column = 'ens_gene', num_cores = 3)
 ```
 
 The remainder of the pipeline is unchanged.
 When running `sleuth_live` or `sleuth_results`, the gene column you selected will be listed as `target_id`, rather than the transcript name.
-
-`sleuth_prep` might take a bit longer here because aggregation has to be done amongst all of the bootstraps as well.
-We are currently working to speed this up and expect to release it along with several memory improvements in the next version (0.28.2).
-One way to speed this up is to use more processes (assuming you have more cores).
-Internally, `sleuth` uses the function `parallel::mclapply`.
-You can set the number of cores as follows:
-
-```{r,eval=FALSE}
-# set the number of available cores to 4
-options(mc.cores = 4L)
-```
