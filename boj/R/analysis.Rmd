@@ -188,7 +188,7 @@ sleuth_significant <- dplyr::filter(full_results, qval <= 0.05)
 head(sleuth_significant, 20)
 ```
 The top gene, ENSMUSG00000099974 is Bcl2a1d. The Boj _et al_. analysis identified Bcl2a1b (see Figure their 5) as the top downregulated gene between mP vs. mN, but Bcl2a1d was not present among the top 10 genes. 
-The second most significant sleuth gene is Gcnt3 which has already been a [https://www.ncbi.nlm.nih.gov/pubmed/26880801](target for pancreatic cancer), but is not among the top genes identified by Boj _et al_. in their Figure 5. 
+The second most significant sleuth gene is Gcnt3 which has already been identified as a [target for pancreatic cancer](https://www.ncbi.nlm.nih.gov/pubmed/26880801), but is not among the top genes identified by Boj _et al_. in their Figure 5. 
 The third sleuth gene ENSMUSG00000030513 is PCSK6 which is thought to play a role in tumor progress (again this gene is not in Boj _et al_ Figure 5). 
 
 A detailed (re)analysis of the Boj _et al_. is beyond the scope of this walkthrough, but other (typical) next steps would be pathway enrichment analysis and follow up experiments examining top up/down regulated genes in more detail.
