@@ -112,7 +112,7 @@ It is prepared and used with four commands that (1) load the kallisto processed 
 First type
 
 ```{r cache=TRUE}
-so <- sleuth_prep(s2c)
+so <- sleuth_prep(s2c,extra_bootstrap_summary = TRUE)
 ```
 
 then fit the full model
