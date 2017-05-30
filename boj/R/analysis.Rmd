@@ -79,11 +79,6 @@ head(ttg)
 
 ## Creating the sleuth object
 
-```{r}
-# TODO: temporary. remove after zip file is fixed
-sample_to_condition <- dplyr::filter(sample_to_condition, sample != "SRR1654626")
-```
-
 The next step is to prepare for differential analysis by creating a sleuth object:
 
 ```{r}
@@ -178,12 +173,22 @@ The sleuth commands for performing the differential analysis are:
 
 ```{r}
 so <- sleuth_fit(so, ~sex + genotype, 'full')
-so <- sleuth_fit(so, ~genotype, 'genotype')
+so <- sleuth_fit(so, ~sex, 'genotype')
 so <- sleuth_lrt(so, 'genotype', 'full')
 full_results <- sleuth_results(so, 'genotype:full', 'lrt', show_all = FALSE)
 ```
 
 A comparison with the naíve analysis as demonstrated in the [Bottomly _et al_. walkthrough](http://pachterlab.github.io/sleuth/walkthroughs/bottomly/) is intructive to perform here as well; we omit the details as they are already demonstrated in the Bottomly _et al_. walkthrough. 
 
-Instead, the walkthrough is concluded by a comparison to the anlaysis of the Boj _et al_. paper which (a) did not remove the outlier and (b) did not test with respect to sex.
-The most significant gene in the sleuth analysis is:
+Instead, the walkthrough is concluded by a comparison to the anlaysis of the Boj _et al_. paper which (a) did not remove the outlier, (b) did not test conditioning on sex, and (c) performed three pairwise tests among the conditions instead of one single test (thus not properly correcting p-values for multiple testing).
+The most significant genes in the sleuth analysis are:
+
+```{r}
+sleuth_significant <- dplyr::filter(full_results, qval <= 0.05)
+head(sleuth_significant, 20)
+```
+The top gene, ENSMUSG00000099974 is Bcl2a1d. The Boj _et al_. analysis identified Bcl2a1b (see Figure their 5) as the top downregulated gene between mP vs. mN, but Bcl2a1d was not present among the top 10 genes. 
+The second most significant sleuth gene is Gcnt3 which has already been a [https://www.ncbi.nlm.nih.gov/pubmed/26880801](target for pancreatic cancer), but is not among the top genes identified by Boj _et al_. in their Figure 5. 
+The third sleuth gene ENSMUSG00000030513 is PCSK6 which is thought to play a role in tumor progress (again this gene is not in Boj _et al_ Figure 5). 
+
+A detailed (re)analysis of the Boj _et al_. is beyond the scope of this walkthrough, but other (typical) next steps would be pathway enrichment analysis and follow up experiments examining top up/down regulated genes in more detail.
