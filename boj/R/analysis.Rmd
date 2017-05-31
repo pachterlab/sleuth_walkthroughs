@@ -12,6 +12,8 @@ output:
   html_document:
     toc: false
     theme: default
+    fig_height: 12
+    fig_width: 10
 
 abstract: "This walkthrough teaches the use of sleuth for identifying differences in expression between any of a number of multiple conditions."
 ---
@@ -33,8 +35,8 @@ Requirements for this tutorial:
 To facilitate practice with the walkthrough we have made kallisto pseudoalignments for the samples available here:
 
 ```{bash eval=FALSE}
-wget -O ../Boj_results.zip 'https://www.dropbox.com/s/8swoeu94candjxd/Boj_results.zip?dl=1'
-unzip ../Boj_results.zip -d ../results
+wget -O ../Boj_results.zip 'https://www.dropbox.com/s/j4bznighrbtj02i/Boj_results.zip?dl=1'
+unzip ../Boj_results.zip -d ..
 ```
 
 The SRA runtable looks like this:
@@ -109,7 +111,7 @@ plot_pca(so, color_by = 'genotype', text_labels = TRUE)
 
 The outlier sample is `SRR1654638`.
 
-Removal of outliers can greatly improve results, and is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keeping errors/sample mix-ups. 
+Removal of outliers can greatly improve results, and is sometimes warranted due to botched sample prep, problems with sequencing or occasionally book-keeping errors/sample mix-ups.
 However removing outliers can also accidentally, if not intentionally, become a form of data fishing.
 
 Therefore before removing outliers it is prudent to try to understand _why_ a sample might be an outlier. To do so it is helpful to examine the PCA loadings, i.e. the primary genes whose linear combinations define the principal components:
@@ -124,7 +126,7 @@ The first gene driving PC1 is
 plot_bootstrap(so, 'ENSMUSG00000096887', color_by = 'genotype')
 ```
 
-The gene is highly expressed and is variable between samples, but the outlier sample does not appear to be particularly different than the other samples. However the second gene influencing PC1 reveals the source of variation causing sample SRR1654638 to be an outlier.  
+The gene is highly expressed and is variable between samples, but the outlier sample does not appear to be particularly different than the other samples. However the second gene influencing PC1 reveals the source of variation causing sample SRR1654638 to be an outlier.
 
 ```{r}
 plot_bootstrap(so, 'ENSMUSG00000035202', color_by = 'genotype')
@@ -178,7 +180,7 @@ so <- sleuth_lrt(so, 'genotype', 'full')
 full_results <- sleuth_results(so, 'genotype:full', 'lrt', show_all = FALSE)
 ```
 
-A comparison with the naíve analysis as demonstrated in the [Bottomly _et al_. walkthrough](http://pachterlab.github.io/sleuth/walkthroughs/bottomly/) is intructive to perform here as well; we omit the details as they are already demonstrated in the Bottomly _et al_. walkthrough. 
+A comparison with the naíve analysis as demonstrated in the [Bottomly _et al_. walkthrough](http://pachterlab.github.io/sleuth/walkthroughs/bottomly/) is intructive to perform here as well; we omit the details as they are already demonstrated in the Bottomly _et al_. walkthrough.
 
 Instead, the walkthrough is concluded by a comparison to the anlaysis of the Boj _et al_. paper which (a) did not remove the outlier, (b) did not test conditioning on sex, and (c) performed three pairwise tests among the conditions instead of one single test (thus not properly correcting p-values for multiple testing).
 The most significant genes in the sleuth analysis are:
@@ -187,8 +189,8 @@ The most significant genes in the sleuth analysis are:
 sleuth_significant <- dplyr::filter(full_results, qval <= 0.05)
 head(sleuth_significant, 20)
 ```
-The top gene, ENSMUSG00000099974 is Bcl2a1d. The Boj _et al_. analysis identified Bcl2a1b (see Figure their 5) as the top downregulated gene between mP vs. mN, but Bcl2a1d was not present among the top 10 genes. 
-The second most significant sleuth gene is Gcnt3 which has already been identified as a [target for pancreatic cancer](https://www.ncbi.nlm.nih.gov/pubmed/26880801), but is not among the top genes identified by Boj _et al_. in their Figure 5. 
-The third sleuth gene ENSMUSG00000030513 is PCSK6 which is thought to play a role in tumor progress (again this gene is not in Boj _et al_ Figure 5). 
+The top gene, ENSMUSG00000099974 is Bcl2a1d. The Boj _et al_. analysis identified Bcl2a1b (see Figure their 5) as the top downregulated gene between mP vs. mN, but Bcl2a1d was not present among the top 10 genes.
+The second most significant sleuth gene is Gcnt3 which has already been identified as a [target for pancreatic cancer](https://www.ncbi.nlm.nih.gov/pubmed/26880801), but is not among the top genes identified by Boj _et al_. in their Figure 5.
+The third sleuth gene ENSMUSG00000030513 is PCSK6 which is thought to play a role in tumor progress (again this gene is not in Boj _et al_ Figure 5).
 
 A detailed (re)analysis of the Boj _et al_. is beyond the scope of this walkthrough, but other (typical) next steps would be pathway enrichment analysis and follow up experiments examining top up/down regulated genes in more detail.

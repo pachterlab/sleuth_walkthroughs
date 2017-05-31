@@ -10,6 +10,9 @@ output:
   html_document:
     toc: false
     theme: default
+    fig_height: 12
+    fig_width: 10
+
 
 abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates via an example of conditioning on batch effect."
 ---
@@ -35,7 +38,8 @@ Set the working directory with the `setwd()` command.
 
 Requirements for this walkthrough:
 
-- `cowplot` for making prettier plots and plots with grids. Available in CRAN:  `install.packages('cowplot')`
+- knowledge of [how to use sleuth for simple two condition experiments](https://pachterlab.github.io/sleuth/walkthroughs/trapnell).
+- `cowplot` for making prettier plots and plots with grids. Available in CRAN:  `install.packages('cowplot')`.
 - `biomaRt` for extracting the Ensembl transcript to gene mapping. For alternative methods, [please see this walk-through](TODO).
 
 To install the package:
@@ -49,12 +53,10 @@ biocLite("biomaRt")
 
 ```{bash eval=FALSE}
 wget -O ../Bottomly_results.zip 'https://www.dropbox.com/s/gnbnkuup3pdfenk/Bottomly_results.zip?dl=1'
-unzip ../Bottomly_results.zip -d ../results
+unzip ../Bottomly_results.zip -d ..
 ```
 
-- `sleuth`
-
-To install sleuth:
+Let's load the requisite packages:
 
 ```{r}
 library('cowplot')
@@ -136,11 +138,6 @@ In other words, to use Ensembl transcript-gene associations kallisto was run usi
 
 # Preparing the analysis
 
-```{r}
-# TODO: temporary -- remove
-metadata <- dplyr::filter(metadata, sample != 'SRR099223')
-```
-
 The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed:
 
 ```{r cache=TRUE}
@@ -162,7 +159,7 @@ The second model is known as the full model, and it includes a parameter that is
 We call it the "strain model".
 With the likelihood ratio test sleuth identifies genes whose abundances are significantly better explained when strain is taken into account. The mechanics of the fitting are:
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_fit(so, ~1, 'intercept')
 so <- sleuth_fit(so, ~strain, 'strain')
 ```
@@ -211,7 +208,7 @@ This batch effect is problematic, as genes might be identified as differential i
 
 To test whether this is in fact the case, the test described above can be repeated with the full model comprising a paramter for "lane" instead of "strain".
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_fit(so, ~lane, 'lane')
 ```
 
@@ -235,7 +232,7 @@ To identify genes that are truly differential between strain, it is therefore ne
 
 To account for batch while testing for strain differences, the full model must include parameters for both lane and strain.
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_fit(so, ~lane + strain, 'full')
 ```
 

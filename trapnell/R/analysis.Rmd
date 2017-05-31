@@ -10,6 +10,8 @@ output:
   html_document:
     toc: false
     theme: default
+    fig_height: 12
+    fig_width: 10
 
 abstract: "This walkthrough is an introduction to the use of sleuth for differential expression analysis."
 ---
@@ -106,7 +108,7 @@ It is important to check that the pairings are correct:
 print(s2c)
 ```
 
-Next, the "sleuth object" can be constructed. This object will store not only the information about the experiment, but also details of the model to be used for differential testing, and the results. 
+Next, the "sleuth object" can be constructed. This object will store not only the information about the experiment, but also details of the model to be used for differential testing, and the results.
 It is prepared and used with four commands that (1) load the kallisto processed data into the object (2) estimate parameters for the __sleuth__ response error measurement (full) model (3) estimate parameters for the __sleuth__ reduced model, and (4) perform differential analysis (testing). On a laptop the four steps should take about a few minutes altogether.
 
 First type
@@ -122,7 +124,7 @@ so <- sleuth_fit(so, ~condition, 'full')
 ```
 
 What this has accomplished is to "smooth" the raw kallisto abundance estimates for each sample using a linear model with a parameter that represents the experimental condition (in this case scramble vs. HOXA1KD).
-To test for transcripts that are differential expressed between the conditions, sleuth performs a second fit to a model that presumes abundances are equal in the two conditions. 
+To test for transcripts that are differential expressed between the conditions, sleuth performs a second fit to a model that presumes abundances are equal in the two conditions.
 To identify differential expressed transcripts sleuth will then identify transcripts with a significantly better fit with the "full" model.
 
 The "reduced" model is fit with
@@ -137,7 +139,7 @@ and the test is performed with
 so <- sleuth_lrt(so, 'reduced', 'full')
 ```
 
-In general, sleuth can utilize the likelihood ratio test with any pair of models that are nested, and other walkthroughs illustrate the power of such a framework for accounting for batch effects and more complex experimental designs. 
+In general, sleuth can utilize the likelihood ratio test with any pair of models that are nested, and other walkthroughs illustrate the power of such a framework for accounting for batch effects and more complex experimental designs.
 
 The models that have been fit can always be examined with the `models()` function.
 
@@ -207,4 +209,3 @@ Among the tables and visualizations that can be explored with sleuth_live are a 
 ```{r}
 plot_pca(so, color_by = 'condition')
 ```
-
