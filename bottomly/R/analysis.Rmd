@@ -10,7 +10,7 @@ output:
   html_document:
     toc: false
     theme: default
-    fig_height: 12
+    fig_height: 10
     fig_width: 10
 
 
@@ -59,8 +59,10 @@ unzip ../Bottomly_results.zip -d ..
 Let's load the requisite packages:
 
 ```{r}
-library('cowplot')
-library('sleuth')
+suppressMessages({
+  library('cowplot')
+  library('sleuth')
+})
 ```
 
 ## Parsing metadata
@@ -141,7 +143,7 @@ In other words, to use Ensembl transcript-gene associations kallisto was run usi
 The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, the full model to be estimated from the data, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design, `~strain` specifies the full model to be estimated, and `target_mapping` describes the transcript groupings into genes previously constructed:
 
 ```{r cache=TRUE}
-so <- sleuth_prep(metadata, ~strain, target_mapping = ttg,
+so <- sleuth_prep(metadata, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
 ```
 
@@ -199,7 +201,7 @@ plot_pca(so, color_by = 'strain')
 The source of the clustering is revealed by coloring the samples by "lane" instead:
 
 ```{r}
-plot_pca(so, color_by = 'lane')
+plot_pca(so, color_by = 'lane', text_labels = TRUE)
 ```
 
 This batch effect is problematic, as genes might be identified as differential in the strain analysis merely because they were sequenced on different lanes.

@@ -12,7 +12,7 @@ output:
   html_document:
     toc: false
     theme: default
-    fig_height: 12
+    fig_height: 10
     fig_width: 10
 
 abstract: "This walkthrough teaches the use of sleuth for identifying differences in expression between any of a number of multiple conditions."
@@ -55,10 +55,13 @@ head(sample_to_condition)
 
 ```
 
-Finally, __sleuth__ is loaded with
+Finally, __sleuth__ and cowplot (we like the default theme better) are loaded with
 
 ```{r}
-library('sleuth')
+suppressMessages({
+  library('cowplot')
+  library('sleuth')
+})
 ```
 
 ## Associating transcripts to genes
@@ -103,10 +106,14 @@ plot_pca(so, color_by = 'genotype')
 ```
 
 The plot reveals a an outlier.
+Additionally, because of the default legend positioning with ggplot, the image is a bit distorted.
+We will fix that here and in the following plots.
 The sample corresponding to the outlier can be identified by using the sample name labels in the PCA plot:
 
 ```{r}
-plot_pca(so, color_by = 'genotype', text_labels = TRUE)
+new_position_theme <- theme(legend.position = c(0.80, 0.90))
+plot_pca(so, color_by = 'genotype', text_labels = TRUE) +
+  new_position_theme
 ```
 
 The outlier sample is `SRR1654638`.
@@ -123,13 +130,15 @@ plot_loadings(so, pc_input = 1)
 The first gene driving PC1 is
 
 ```{r}
-plot_bootstrap(so, 'ENSMUSG00000096887', color_by = 'genotype')
+plot_bootstrap(so, 'ENSMUSG00000096887', color_by = 'genotype') +
+  new_position_theme
 ```
 
 The gene is highly expressed and is variable between samples, but the outlier sample does not appear to be particularly different than the other samples. However the second gene influencing PC1 reveals the source of variation causing sample SRR1654638 to be an outlier.
 
 ```{r}
-plot_bootstrap(so, 'ENSMUSG00000035202', color_by = 'genotype')
+plot_bootstrap(so, 'ENSMUSG00000035202', color_by = 'genotype') +
+  new_position_theme
 ```
 
 Sample SRR1654638 is markedly different from all of the other samples.
@@ -152,13 +161,15 @@ so <- sleuth_prep(sample_to_condition, target_mapping = ttg,
 ```
 
 ```{r}
-plot_pca(so, color_by = 'genotype', text_labels = TRUE)
+plot_pca(so, color_by = 'genotype', text_labels = TRUE) +
+  new_position_theme
 ```
 
 It is useful to examine the data with respect to different covariates as well; coloring by sex is shown below:
 
 ```{r}
-plot_pca(so, color_by = 'sex')
+plot_pca(so, color_by = 'sex') +
+  new_position_theme
 ```
 
 # Testing for differential genes
@@ -173,7 +184,7 @@ By comparing expression estimates deirved according to the two models, sleuth is
 
 The sleuth commands for performing the differential analysis are:
 
-```{r}
+```{r cache=TRUE}
 so <- sleuth_fit(so, ~sex + genotype, 'full')
 so <- sleuth_fit(so, ~sex, 'genotype')
 so <- sleuth_lrt(so, 'genotype', 'full')

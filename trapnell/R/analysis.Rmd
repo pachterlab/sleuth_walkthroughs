@@ -10,7 +10,7 @@ output:
   html_document:
     toc: false
     theme: default
-    fig_height: 12
+    fig_height: 10
     fig_width: 10
 
 abstract: "This walkthrough is an introduction to the use of sleuth for differential expression analysis."
@@ -61,7 +61,9 @@ unzip ../Trapnell_results.zip -d ..
 Once the kallisto quantifications have been obtained, the analysis shifts to R and begins with loading __sleuth__:
 
 ```{r}
-library("sleuth")
+suppressMessages({
+  library("sleuth")
+})
 ```
 
 The first step in a __sleuth__ analysis is to specify where the __kallisto__ results are stored.
@@ -114,7 +116,7 @@ It is prepared and used with four commands that (1) load the kallisto processed 
 The sleuth object must first be initialized with
 
 ```{r cache=TRUE}
-so <- sleuth_prep(s2c,extra_bootstrap_summary = TRUE)
+so <- sleuth_prep(s2c, extra_bootstrap_summary = TRUE)
 ```
 
 Then the full model is fit with
