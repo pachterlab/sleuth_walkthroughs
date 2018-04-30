@@ -14,14 +14,13 @@ output:
     fig_width: 10
 
 
-abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates. It is updated for sleuth v.0.30.0 which uses p-value aggregation to perform gene differential expression."
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates. It is updated for sleuth v.0.30.0 which uses aggregation of transcript p-values to perform gene differential expression, as introduced in Yi et al., 2017."
 ---
 
-
+# Introduction
 This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects or by multiple experimental covariates in the data.
-The example uses data from the paper Frahm et al., 2017.
-In addition to this walkthrough, data from the paper was used for some of the [analyses in the p-value aggregation paper](https://doi.org/10.1186/s13059-018-1419-z), which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results.
-The specific data that are examined in this walkthrough are 24 RNA-Seq samples from  primary neural progenitor cells extracted from embryonic mice, which, along with the metadata table, [can be downloaded here](https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012).
+This tutorial showcases an analysis that was performed in [the paper by Yi et al., Genome Biology, 2017](https://doi.org/10.1186/s13059-018-1419-z), which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results.
+The example uses data from the paper Frahm et al., 2017. The specific data that are examined in this walkthrough are 24 RNA-Seq samples from  primary neural progenitor cells extracted from embryonic mice, which, along with the metadata table, [can be downloaded here](https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012).
 In this walkthrough we examine in detail how to analyze the RNA-Seq dataset in order to obtain both gene-level and transcript-level differential expression results that are consistent with each other. Furthermore, the walkthrough is instructive in testing for differential expression in experiments where there are many experimental covariates and/or batch effects that must be accounted for.
 
 # Preliminaries

@@ -138,13 +138,16 @@ $(document).ready(function () {
 <h4 class="author"><em>Lior Pachter</em></h4>
 <div class="abstract">
 <p class="abstract">Abstract</p>
-This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates. It is updated for sleuth v.0.30.0 which uses p-value aggregation to perform gene differential expression.
+This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates. It is updated for sleuth v.0.30.0 which uses aggregation of transcript p-values to perform gene differential expression, as introduced in Yi et al., 2017.
 </div>
 
 </div>
 
 
-<p>This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects or by multiple experimental covariates in the data. The example uses data from the paper Frahm et al., 2017. In addition to this walkthrough, data from the paper was used for some of the <a href="https://doi.org/10.1186/s13059-018-1419-z">analyses in the p-value aggregation paper</a>, which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results. The specific data that are examined in this walkthrough are 24 RNA-Seq samples from primary neural progenitor cells extracted from embryonic mice, which, along with the metadata table, <a href="https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012">can be downloaded here</a>. In this walkthrough we examine in detail how to analyze the RNA-Seq dataset in order to obtain both gene-level and transcript-level differential expression results that are consistent with each other. Furthermore, the walkthrough is instructive in testing for differential expression in experiments where there are many experimental covariates and/or batch effects that must be accounted for.</p>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects or by multiple experimental covariates in the data. This tutorial showcases an analysis that was performed in <a href="https://doi.org/10.1186/s13059-018-1419-z">the paper by Yi et al., Genome Biology, 2017</a>, which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results. The example uses data from the paper Frahm et al., 2017. The specific data that are examined in this walkthrough are 24 RNA-Seq samples from primary neural progenitor cells extracted from embryonic mice, which, along with the metadata table, <a href="https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012">can be downloaded here</a>. In this walkthrough we examine in detail how to analyze the RNA-Seq dataset in order to obtain both gene-level and transcript-level differential expression results that are consistent with each other. Furthermore, the walkthrough is instructive in testing for differential expression in experiments where there are many experimental covariates and/or batch effects that must be accounted for.</p>
+</div>
 <div id="preliminaries" class="section level1">
 <h1>Preliminaries</h1>
 <p>Create a directory for the analysis and start up <code>R</code>. Set the working directory with the <code>setwd()</code> command.</p>
@@ -259,9 +262,6 @@ head(ttg)</code></pre>
 <p>The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, <code>metadata</code> is the experimental design and <code>target_mapping</code> describes the transcript groupings into genes previously constructed. Furthermore, we provide an aggregation_column, the column name of in ‘target_mapping’ table that is used to aggregate the transcripts. When both ‘target_mapping’ and ‘aggregation_column’ are provided, sleuth will automatically run in gene mode, returning gene differential expression results that came from the aggregation of transcript p-values.</p>
 <pre class="r"><code>so &lt;- sleuth_prep(metadata, target_mapping = ttg,
   aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)</code></pre>
-<pre><code>## Warning in check_num_cores(num_cores): It appears that you are running Sleuth from within Rstudio.
-## Because of concerns with forking processes from a GUI, 'num_cores' is being set to 1.
-## If you wish to take advantage of multiple cores, please consider running sleuth from the command line.</code></pre>
 <pre><code>## reading in kallisto results</code></pre>
 <pre><code>## dropping unused factor levels</code></pre>
 <pre><code>## ........................</code></pre>
@@ -274,8 +274,7 @@ head(ttg)</code></pre>
 ## 48073 targets passed the filter
 ## normalizing tpm
 ## merging in metadata
-## summarizing bootstraps
-## ........................</code></pre>
+## summarizing bootstraps</code></pre>
 </div>
 <div id="the-analysis" class="section level1">
 <h1>The analysis</h1>
