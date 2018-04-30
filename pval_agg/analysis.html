@@ -144,7 +144,7 @@ This walkthrough teaches the use of sleuth for analysis of experimental designs 
 </div>
 
 
-<p>This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data. The example uses data from the paper Frahm et al., 2017. In addition to this walkthrough, data from the paper was used for some of the <a href="https://doi.org/10.1186/s13059-018-1419-z">analyses in the p-value aggregation paper</a>, which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results. The specific data that are examined in this walkthrough are 24 RNA-Seq samples from primary neural progenitor cells extracted from embryonic mice, which can be downloaded <a href="https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012">here</a>. In this walkthrough we examine in detail how to analyze the RNA-Seq. This walkthrough, in addition to illustrating how to condition on batch effects, provides an example for how to use sleuth for analyses of experimental designs with multiple covariates.</p>
+<p>This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects or by multiple experimental covariates in the data. The example uses data from the paper Frahm et al., 2017. In addition to this walkthrough, data from the paper was used for some of the <a href="https://doi.org/10.1186/s13059-018-1419-z">analyses in the p-value aggregation paper</a>, which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results. The specific data that are examined in this walkthrough are 24 RNA-Seq samples from primary neural progenitor cells extracted from embryonic mice, which, along with the metadata table, <a href="https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012">can be downloaded here</a>. In this walkthrough we examine in detail how to analyze the RNA-Seq dataset in order to obtain both gene-level and transcript-level differential expression results that are consistent with each other. Furthermore, the walkthrough is instructive in testing for differential expression in experiments where there are many experimental covariates and/or batch effects that must be accounted for.</p>
 <div id="preliminaries" class="section level1">
 <h1>Preliminaries</h1>
 <p>Create a directory for the analysis and start up <code>R</code>. Set the working directory with the <code>setwd()</code> command.</p>
@@ -156,178 +156,40 @@ This walkthrough teaches the use of sleuth for analysis of experimental designs 
 <p>To install the package:</p>
 <pre class="r"><code>source(&quot;https://bioconductor.org/biocLite.R&quot;)
 biocLite(&quot;biomaRt&quot;)</code></pre>
-<ul>
-<li>The walthrough begins after the RNA-Seq samples have been quantified with kallisto. While kallisto is very fast in quantifying samples, downloading the raw data from the short read archive is time consuming. kallisto quantifications are therefore directly downloadable for the relevant samples from <a href="https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012">this link</a>. This dataset also includes a metadata file that describes the experimental design. Please download this dataset from the link and unzip it.</li>
-</ul>
+<p>The walthrough begins after the RNA-Seq samples have been quantified with kallisto. While kallisto is very fast in quantifying samples, downloading the raw data from the short read archive is time consuming. kallisto quantifications are therefore directly downloadable for the relevant samples from <a href="https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012">this link</a>. This dataset also includes a metadata file that describes the experimental design. Please download this dataset from the link and unzip it.</p>
 <p>Let’s load the requisite packages:</p>
 <pre class="r"><code>suppressMessages({
   library('cowplot')
   library('sleuth')
 })</code></pre>
-<pre><code>## Warning: package 'cowplot' was built under R version 3.4.3</code></pre>
-<pre><code>## Warning: package 'dplyr' was built under R version 3.4.2</code></pre>
 <div id="parsing-metadata" class="section level2">
 <h2>Parsing metadata</h2>
-<p>A sleuth analysis is dependent on a metadata file, which describes the experimental design, the sample names, conditions and covariates. The metadata file is external to sleuth, and must be prepared prior to analysis. A metadata file should have been downloaded along with the kallisto quantifications. The first step in a sleuth analysis is loading of the metadata file. You might need the path in read_table below to where you have downloaded the kallisto dataset, so that the path directs to the sample_table.txt.</p>
-<pre class="r"><code>metadata &lt;- read.table('../../../SRP100701/sample_table.txt', sep='\t', header=TRUE, stringsAsFactors = FALSE)</code></pre>
+<p>A sleuth analysis is dependent on a metadata file, which describes the experimental design, the sample names, conditions and covariates. The metadata file is external to sleuth, and must be prepared prior to analysis. A metadata file should have been downloaded along with the kallisto quantifications. The first step in a sleuth analysis is loading of the metadata file. You might need the path in read_table below to where you have downloaded the kallisto dataset, so that the path directs to the sample_table.txt. We then select the relevant columns of the metadata.</p>
+<pre class="r"><code>metadata &lt;- read.table('../../../SRP100701/sample_table.txt', sep='\t', header=TRUE, stringsAsFactors = FALSE)
+metadata &lt;- dplyr::select(metadata, c('Run_s', 'gender_s', 'tissue_region_s', 'treatment_s'))</code></pre>
 <pre class="r"><code>head(metadata, n = 20)</code></pre>
-<pre><code>##    AvgSpotLen_l  BioSample_s Experiment_s MBases_l MBytes_l      Run_s
-## 1            50 SAMN06446197   SRX2588583     1727     1713 SRR5285036
-## 2            50 SAMN06446200   SRX2588584     1776     1750 SRR5285037
-## 3            50 SAMN06446220   SRX2588585     1638     1627 SRR5285038
-## 4            50 SAMN06446219   SRX2588586     1310     1307 SRR5285039
-## 5            50 SAMN06446218   SRX2588587     1560     1554 SRR5285040
-## 6            50 SAMN06446217   SRX2588588     1773     1754 SRR5285041
-## 7            50 SAMN06446216   SRX2588589     1533      957 SRR5285042
-## 8            50 SAMN06446215   SRX2588590     1545      959 SRR5285043
-## 9            50 SAMN06446214   SRX2588591     1539     1535 SRR5285044
-## 10           50 SAMN06446213   SRX2588592     1505     1493 SRR5285045
-## 11           50 SAMN06446212   SRX2588593     1707     1689 SRR5285046
-## 12           50 SAMN06446211   SRX2588594     1666     1644 SRR5285047
-## 13           51 SAMN06446210   SRX2588595     1013      663 SRR5285048
-## 14           51 SAMN06446201   SRX2588596     1190      780 SRR5285049
-## 15           51 SAMN06446209   SRX2588597     1378      901 SRR5285050
-## 16           51 SAMN06446208   SRX2588598     1407      926 SRR5285051
-## 17           51 SAMN06446207   SRX2588599     1407      921 SRR5285052
-## 18           51 SAMN06446206   SRX2588600     1468      960 SRR5285053
-## 19           51 SAMN06446205   SRX2588601     1646     1080 SRR5285054
-## 20           51 SAMN06446204   SRX2588602     1503      984 SRR5285055
-##    SRA_Sample_s Sample_Name_s gender_s
-## 1    SRS2001779    GSM2508021   female
-## 2    SRS2001780    GSM2508022   female
-## 3    SRS2001781    GSM2508023   female
-## 4    SRS2001782    GSM2508024   female
-## 5    SRS2001783    GSM2508025   female
-## 6    SRS2001784    GSM2508026   female
-## 7    SRS2001785    GSM2508027     male
-## 8    SRS2001786    GSM2508028     male
-## 9    SRS2001787    GSM2508029     male
-## 10   SRS2001788    GSM2508030     male
-## 11   SRS2001789    GSM2508031     male
-## 12   SRS2001790    GSM2508032     male
-## 13   SRS2001791    GSM2508033     male
-## 14   SRS2001792    GSM2508034     male
-## 15   SRS2001793    GSM2508035   female
-## 16   SRS2001794    GSM2508036   female
-## 17   SRS2001795    GSM2508037   female
-## 18   SRS2001796    GSM2508038   female
-## 19   SRS2001797    GSM2508039   female
-## 20   SRS2001798    GSM2508040   female
-##                                     source_name_s tissue_region_s
-## 1        Female ethanol vehicle treatment, Cortex          Cortex
-## 2          Female dexamethasone treatment, Cortex          Cortex
-## 3        Female ethanol vehicle treatment, Cortex          Cortex
-## 4          Female dexamethasone treatment, Cortex          Cortex
-## 5        Female ethanol vehicle treatment, Cortex          Cortex
-## 6          Female dexamethasone treatment, Cortex          Cortex
-## 7          Male ethanol vehicle treatment, Cortex          Cortex
-## 8            Male dexamethasone treatment, Cortex          Cortex
-## 9          Male ethanol vehicle treatment, Cortex          Cortex
-## 10           Male dexamethasone treatment, Cortex          Cortex
-## 11         Male ethanol vehicle treatment, Cortex          Cortex
-## 12           Male dexamethasone treatment, Cortex          Cortex
-## 13     Male dexamethasone treatment, Hypothalamus    Hypothalamus
-## 14   Male ethanol vehicle treatment, Hypothalamus    Hypothalamus
-## 15   Female dexamethasone treatment, Hypothalamus    Hypothalamus
-## 16 Female ethanol vehicle treatment, Hypothalamus    Hypothalamus
-## 17   Female dexamethasone treatment, Hypothalamus    Hypothalamus
-## 18 Female ethanol vehicle treatment, Hypothalamus    Hypothalamus
-## 19   Female dexamethasone treatment, Hypothalamus    Hypothalamus
-## 20 Female ethanol vehicle treatment, Hypothalamus    Hypothalamus
-##      treatment_s Assay_Type_s BioProject_s Center_Name_s Consent_s
-## 1        Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 2  Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 3        Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 4  Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 5        Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 6  Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 7        Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 8  Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 9        Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 10 Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 11       Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 12 Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 13 Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 14       Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 15 Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 16       Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 17 Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 18       Vehicle      RNA-Seq  PRJNA376745           GEO    public
-## 19 Dexamethasone      RNA-Seq  PRJNA376745           GEO    public
-## 20       Vehicle      RNA-Seq  PRJNA376745           GEO    public
-##    InsertSize_l        Instrument_s LibraryLayout_s LibrarySelection_s
-## 1             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 2             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 3             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 4             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 5             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 6             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 7             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 8             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 9             0 Illumina HiSeq 2500          SINGLE               cDNA
-## 10            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 11            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 12            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 13            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 14            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 15            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 16            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 17            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 18            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 19            0 Illumina HiSeq 2500          SINGLE               cDNA
-## 20            0 Illumina HiSeq 2500          SINGLE               cDNA
-##    LibrarySource_s LoadDate_s   Organism_s Platform_s ReleaseDate_s
-## 1   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 2   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 3   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 4   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 5   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 6   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 7   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 8   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 9   TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 10  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 11  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 12  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 13  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 14  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 15  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 16  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 17  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 18  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 19  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-## 20  TRANSCRIPTOMIC 2017-02-24 Mus musculus   ILLUMINA    2017-05-29
-##    SRA_Study_s               age_s                  cell_type_s tissue_s
-## 1    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 2    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 3    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 4    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 5    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 6    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 7    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 8    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 9    SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 10   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 11   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 12   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 13   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 14   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 15   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 16   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 17   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 18   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 19   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain
-## 20   SRP100701 embryonic day E14.5 neural progenitor/stem cells    brain</code></pre>
-<p>This file describes the experimental design. We are concerned with three major experimental conditions: gender (male vs female), brain region (hypothalamus vs cortex), and treatment (dexamethasone vs control). Combinatorially, we could have a possible of 2^3 = 8 conditions. For each condition, three biological replicates were sequenced, so we have a total of 24 samples. The column ‘gender_s’ lists the gender of the mouse for each sample and can either be ‘female’ or ‘male.’ The ‘tissue_region_s’ column lists the brain region from which the sample was extracted and can either be ‘Cotex’ or ‘Hypothalamus.’ The ‘treatment_s’ column lists whether the sample was subjected to dexamethasone treatment and can either be ‘Dexamethasone’ or ‘Vehicle.’ The ‘Run_s’ column is the SRA run name. The kallisto quantifications are titled with these SRA run names. We will specifically select these relevant columns below.</p>
-<pre class="r"><code>metadata &lt;- dplyr::select(metadata, c('Run_s', 'gender_s', 'tissue_region_s', 'treatment_s'))
-head(metadata)</code></pre>
-<pre><code>##        Run_s gender_s tissue_region_s   treatment_s
-## 1 SRR5285036   female          Cortex       Vehicle
-## 2 SRR5285037   female          Cortex Dexamethasone
-## 3 SRR5285038   female          Cortex       Vehicle
-## 4 SRR5285039   female          Cortex Dexamethasone
-## 5 SRR5285040   female          Cortex       Vehicle
-## 6 SRR5285041   female          Cortex Dexamethasone</code></pre>
+<pre><code>##         Run_s gender_s tissue_region_s   treatment_s
+## 1  SRR5285036   female          Cortex       Vehicle
+## 2  SRR5285037   female          Cortex Dexamethasone
+## 3  SRR5285038   female          Cortex       Vehicle
+## 4  SRR5285039   female          Cortex Dexamethasone
+## 5  SRR5285040   female          Cortex       Vehicle
+## 6  SRR5285041   female          Cortex Dexamethasone
+## 7  SRR5285042     male          Cortex       Vehicle
+## 8  SRR5285043     male          Cortex Dexamethasone
+## 9  SRR5285044     male          Cortex       Vehicle
+## 10 SRR5285045     male          Cortex Dexamethasone
+## 11 SRR5285046     male          Cortex       Vehicle
+## 12 SRR5285047     male          Cortex Dexamethasone
+## 13 SRR5285048     male    Hypothalamus Dexamethasone
+## 14 SRR5285049     male    Hypothalamus       Vehicle
+## 15 SRR5285050   female    Hypothalamus Dexamethasone
+## 16 SRR5285051   female    Hypothalamus       Vehicle
+## 17 SRR5285052   female    Hypothalamus Dexamethasone
+## 18 SRR5285053   female    Hypothalamus       Vehicle
+## 19 SRR5285054   female    Hypothalamus Dexamethasone
+## 20 SRR5285055   female    Hypothalamus       Vehicle</code></pre>
+<p>This file describes the experimental design. We are concerned with three major experimental conditions: gender (male vs female), brain region (hypothalamus vs cortex), and treatment (dexamethasone vs control). Combinatorially, we could have a possible of 2^3 = 8 conditions. For each condition, three biological replicates were sequenced, so we have a total of 24 samples. The column ‘gender_s’ lists the gender of the mouse for each sample and can either be ‘female’ or ‘male.’ The ‘tissue_region_s’ column lists the brain region from which the sample was extracted and can either be ‘Cotex’ or ‘Hypothalamus.’ The ‘treatment_s’ column lists whether the sample was subjected to dexamethasone treatment and can either be ‘Dexamethasone’ or ‘Vehicle.’ The ‘Run_s’ column is the SRA run name. The kallisto quantifications are titled with these SRA run names.</p>
 <p>Finally, we add the path names of the kallisto output directories to the metadata table. We use the SRA run names listed under Run_s to identify the folders we must use for the correpsonding kallisto quantifications:</p>
 <pre class="r"><code>metadata &lt;- dplyr::mutate(metadata,
   path = file.path('..', '..', '..', 'SRP100701', 'kallisto', Run_s, 'abundance.h5'))</code></pre>
@@ -389,7 +251,7 @@ head(ttg)</code></pre>
 ## 4 ENSMUST00000082420 ENSMUSG00000064369    mt-Te
 ## 5 ENSMUST00000082419 ENSMUSG00000064368   mt-Nd6
 ## 6 ENSMUST00000082418 ENSMUSG00000064367   mt-Nd5</code></pre>
-<p>The resulting table contains Ensembl gene names (column 3) and the associated transcripts (column 1). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto. In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.</p>
+<p>The resulting table contains Ensembl gene names (‘ens_gene’) and the associated transcripts (‘target_id’). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto. In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.</p>
 </div>
 </div>
 <div id="preparing-the-analysis" class="section level1">
@@ -428,11 +290,14 @@ head(ttg)</code></pre>
 <pre><code>## computing variance of betas</code></pre>
 <p>The likelihood ratio test (lrt) is performed with</p>
 <pre class="r"><code>so &lt;- sleuth_lrt(so, 'reduced', 'full')</code></pre>
-<p>Significantly differential genes are extracted below. When running the command ‘sleuth_results,’ sleuth uses the p-values from comparing the transcripts to make a gene-level determination and perform gene differential expression.</p>
-<pre class="r"><code>sleuth_table &lt;- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE)
-sleuth_table &lt;- dplyr::filter(sleuth_table, qval &lt;= 0.05)</code></pre>
+</div>
+<div id="obtaining-gene-level-differential-expression-results" class="section level1">
+<h1>Obtaining gene-level differential expression results</h1>
+<p>When running the command ‘sleuth_results,’ sleuth uses the p-values from comparing transcripts to make a gene-level determination and perform gene differential expression.</p>
+<pre class="r"><code>sleuth_table_gene &lt;- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE)
+sleuth_table_gene &lt;- dplyr::filter(sleuth_table_gene, qval &lt;= 0.05)</code></pre>
 <p>The most significantly differential genes are</p>
-<pre class="r"><code>head(sleuth_table, 20)</code></pre>
+<pre class="r"><code>head(sleuth_table_gene, 20)</code></pre>
 <pre><code>##             target_id ext_gene num_aggregated_transcripts
 ## 1  ENSMUSG00000021750  Fam107a                          2
 ## 2  ENSMUSG00000031431  Tsc22d3                          4
@@ -475,10 +340,84 @@ sleuth_table &lt;- dplyr::filter(sleuth_table, qval &lt;= 0.05)</code></pre>
 ## 18           26.928850 1.291974e-19 1.075138e-16
 ## 19           16.932154 1.725660e-19 1.360455e-16
 ## 20            5.406512 5.565135e-19 4.168008e-16</code></pre>
-<p>The number of transcript p-values aggregated per gene is listed in the ‘num_aggregated_transcripts’ column. ‘pval’ displays the p-value for the gene. ‘qval’ displays the Benjamini-Hochberg adjusted FDR for the gene.</p>
-<p>To confirm that the differential analysis is working it’s important to examine specific genes in detail. One can visualize the results by calling:</p>
+<p>The ‘num_aggregated_transcripts’ column lists the number of transcripts used to make the gene determination. ‘pval’ displays the p-value for the gene. ‘qval’ displays the Benjamini-Hochberg-adjusted false discovery rate for the gene.</p>
+</div>
+<div id="obtaining-consistent-transcript-level-differential-expression-results" class="section level1">
+<h1>Obtaining consistent transcript-level differential expression results</h1>
+<p>Because gene results are built on transcript results, the gene and transcript results are entirely consistent and compatible with each other. To visualize the transcript results that led to the gene results above, one merely runs sleuth_results again but this time setting the flag ‘pval_aggregate’ to FALSE.</p>
+<pre class="r"><code>sleuth_table_tx &lt;- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE, pval_aggregate = FALSE)
+sleuth_table_tx &lt;- dplyr::filter(sleuth_table_tx, qval &lt;= 0.05)
+head(sleuth_table_tx, 20)</code></pre>
+<pre><code>##              ens_gene ext_gene             target_id         pval
+## 1  ENSMUSG00000021750  Fam107a  ENSMUST00000121887.7 1.829476e-25
+## 2  ENSMUSG00000033863     Klf9  ENSMUST00000036884.1 4.793292e-24
+## 3  ENSMUSG00000021750  Fam107a ENSMUST00000036070.14 6.747701e-23
+## 4  ENSMUSG00000004328    Hif3a  ENSMUST00000108492.8 1.812342e-21
+## 5  ENSMUSG00000024222    Fkbp5  ENSMUST00000079413.9 5.680690e-20
+## 6  ENSMUSG00000066687   Zbtb16  ENSMUST00000093852.4 9.600232e-20
+## 7  ENSMUSG00000017697      Ada  ENSMUST00000017841.3 6.906094e-19
+## 8  ENSMUSG00000030268    Bcat1  ENSMUST00000111742.7 8.405612e-17
+## 9  ENSMUSG00000042363   Lgalsl  ENSMUST00000047028.8 3.136920e-16
+## 10 ENSMUSG00000014361    Mertk  ENSMUST00000014505.4 3.685836e-16
+## 11 ENSMUSG00000028655   Mfsd2a ENSMUST00000030408.11 1.779574e-15
+## 12 ENSMUSG00000024222    Fkbp5  ENSMUST00000143685.1 1.002824e-14
+## 13 ENSMUSG00000041301     Cftr ENSMUST00000045706.11 1.114918e-14
+## 14 ENSMUSG00000039270    Megf9  ENSMUST00000107359.8 3.619510e-14
+## 15 ENSMUSG00000033350    Chst2  ENSMUST00000036267.7 5.404074e-14
+## 16               &lt;NA&gt;     &lt;NA&gt;  ENSMUST00000216150.1 7.354355e-14
+## 17 ENSMUSG00000029321  Slc10a6  ENSMUST00000031263.1 8.915314e-14
+## 18 ENSMUSG00000041417   Pik3r1 ENSMUST00000055518.12 9.352527e-14
+## 19 ENSMUSG00000031431  Tsc22d3  ENSMUST00000112996.8 8.482895e-14
+## 20 ENSMUSG00000024175    Tekt4  ENSMUST00000025002.1 1.195258e-13
+##            qval test_stat        rss degrees_free mean_obs    var_obs
+## 1  8.794842e-21 108.76246 280.669373            1 2.718501 12.2133455
+## 2  1.152140e-19 102.29115  13.340157            1 6.913866  0.5844469
+## 3  1.081274e-18  97.05356 139.255614            1 4.885285  6.0564408
+## 4  2.178118e-17  90.54044  86.712276            1 4.263146  3.7785977
+## 5  5.461756e-16  83.72690  25.477242            1 7.411716  1.1188608
+## 6  7.691866e-16  82.68966  67.957482            1 5.265512  2.9716287
+## 7  4.742809e-15  78.79043  26.057259            1 5.250812  1.1876264
+## 8  5.051038e-13  69.31201   9.152434            1 6.697062  0.4388519
+## 9  1.675568e-12  66.71529   3.552143            1 7.537579  0.2260117
+## 10 1.771892e-12  66.39742  18.433685            1 6.526403  0.8298976
+## 11 7.777225e-12  63.29498  24.126950            1 6.249944  1.0490541
+## 12 4.017397e-11  59.89054  21.301237            1 4.957294  1.0914547
+## 13 4.122880e-11  59.68200 147.122204            1 4.022313  6.5429592
+## 14 1.242862e-10  57.36522   3.288114            1 7.795270  0.2407627
+## 15 1.731934e-10  56.57698  18.487586            1 8.561777  0.9862396
+## 16 2.209662e-10  55.97112  39.438263            1 4.287644  1.8110435
+## 17 2.366337e-10  55.59272  85.168080            1 1.646779  3.7058050
+## 18 2.366337e-10  55.49861   4.912339            1 9.112843  0.2308038
+## 19 2.366337e-10  55.69046  15.866758            1 4.797077  0.7218183
+## 20 2.872981e-10  55.01644  90.363489            1 2.383602  3.9308187
+##        tech_var   sigma_sq smooth_sigma_sq final_sigma_sq
+## 1  0.0173877392 13.3478205      0.27934327     13.3478205
+## 2  0.0011996840  0.6340459      0.01744821      0.6340459
+## 3  0.0911946895  6.5400250      0.03711745      6.5400250
+## 4  0.0713937993  4.0577622      0.06013749      4.0577622
+## 5  0.0014247192  1.2117773      0.01622906      1.2117773
+## 6  0.0361275574  3.1999430      0.03062587      3.1999430
+## 7  0.0102643237  1.2305575      0.03083081      1.2305575
+## 8  0.0025072342  0.4333230      0.01826801      0.4333230
+## 9  0.0005641150  0.1685856      0.01605604      0.1685856
+## 10 0.0031401891  0.8746543      0.01903031      0.8746543
+## 11 0.0109145683  1.1379878      0.02048658      1.1379878
+## 12 0.1017917350  0.9125529      0.03563513      0.9125529
+## 13 0.4542933713  6.5515259      0.07568787      6.5515259
+## 14 0.0004978436  0.1560790      0.01586337      0.1560790
+## 15 0.0003043504  0.8800569      0.01657514      0.8800569
+## 16 0.3009322201  1.5770803      0.05879156      1.5770803
+## 17 0.1009662122  3.9546566      0.60768065      3.9546566
+## 18 0.0001569347  0.2337640      0.01840321      0.2337640
+## 19 0.0306035579  0.7249564      0.03916975      0.7249564
+## 20 0.1524702243  4.1505531      0.36405843      4.1505531</code></pre>
+<p>The transcript pvals listed in sleuth_table_tx were the ones aggregated to obtain the gene pvals in sleuth_table_gene. In fact, the most differential transcript is one from the gene Fam107a, which is also the most differential gene.</p>
+</div>
+<div id="visualizing-the-results" class="section level1">
+<h1>Visualizing the results</h1>
+<p>One can visualize the results within our R shiny app by calling:</p>
 <pre class="r"><code>sleuth_live(so)</code></pre>
-<p>This will open a new browser that runs the R shiny app. One can visualize the transcript dynamics that resulted in these gene differential results under ‘analysis’ -&gt; ‘gene view.’ Enterring the Ensembl gene name and selecting ‘ens_gene’ from the ‘genes from’ dropdown will display each transcript corresponding to that gene. ‘analyses’ -&gt; ‘test table’ will provide the same results as sleuth_table.</p>
+<p>This will open a new browser that runs the R shiny app. One can visualize the transcript dynamics that resulted in these gene differential results under ‘analysis’ -&gt; ‘gene view.’ Enterring the Ensembl gene name and selecting ‘ens_gene’ from the ‘genes from’ dropdown will display each transcript corresponding to that gene. ‘analyses’ -&gt; ‘test table’ will provide the same results as sleuth_table. As we previously mentioned, because our gene results are based on the transcript results, there is no need to visualize gene abundances separately. Instead, one can use the transcript abundances as the evidence for the gene level differential expression.</p>
 </div>
 
 
