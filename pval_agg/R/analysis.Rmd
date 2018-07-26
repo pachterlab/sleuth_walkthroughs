@@ -1,0 +1,180 @@
+---
+title: "Using p-value aggregation to obtain gene differential expression in datasets with multiple experimental conditions"
+author:
+- Lynn Yi
+- Harold Pimentel
+- Nicolas Bray
+- Lior Pachter
+
+output:
+  html_document:
+    toc: false
+    theme: default
+    fig_height: 10
+    fig_width: 10
+
+
+abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates. It is updated for sleuth v.0.30.0 which uses aggregation of transcript p-values to perform gene differential expression, as introduced in Yi et al., 2017."
+---
+
+# Introduction
+This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects or by multiple experimental covariates in the data.
+This tutorial showcases an analysis that was performed in [the paper by Yi et al., Genome Biology, 2017](https://doi.org/10.1186/s13059-018-1419-z), which demonstrates the merits of aggregating p-values from transcript differential expression to gene-level results.
+The example uses data from the paper Frahm et al., 2017. The specific data that are examined in this walkthrough are 24 RNA-Seq samples from  primary neural progenitor cells extracted from embryonic mice, which, along with the metadata table, [can be downloaded here](https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012).
+In this walkthrough we examine in detail how to analyze the RNA-Seq dataset in order to obtain both gene-level and transcript-level differential expression results that are consistent with each other. Furthermore, the walkthrough is instructive in testing for differential expression in experiments where there are many experimental covariates and/or batch effects that must be accounted for.
+
+# Preliminaries
+
+Create a directory for the analysis and start up `R`.
+Set the working directory with the `setwd()` command.
+
+Requirements for this walkthrough:
+
+- `cowplot` for making prettier plots and plots with grids. Available in CRAN:  `install.packages('cowplot')`.
+- `biomaRt` for extracting the Ensembl transcript to gene mapping.
+
+To install the package:
+
+```{r eval=FALSE}
+source("https://bioconductor.org/biocLite.R")
+biocLite("biomaRt")
+```
+
+The walthrough begins after the RNA-Seq samples have been quantified with kallisto. While kallisto is very fast in quantifying samples, downloading the raw data from the short read archive is time consuming. kallisto quantifications are therefore directly downloadable for the relevant samples from [this link](https://figshare.com/articles/kallisto_quantifications_of_Frahm_et_al_2017/6203012). This dataset also includes a metadata file that describes the experimental design.  Please download this dataset from the link and unzip it.
+
+Let's load the requisite packages:
+
+```{r warning=FALSE}
+suppressMessages({
+  library('cowplot')
+  library('sleuth')
+})
+```
+
+## Parsing metadata
+
+A sleuth analysis is dependent on a metadata file, which describes the experimental design, the sample names, conditions and covariates. The metadata file is external to sleuth, and must be prepared prior to analysis. A metadata file should have been downloaded along with the kallisto quantifications.  The first step in a sleuth analysis is loading of the metadata file. You might need the path in read_table below to where you have downloaded the kallisto dataset, so that the path directs to the sample_table.txt. We then select the relevant columns of the metadata.
+
+
+```{r}
+metadata <- read.table('../../../SRP100701/sample_table.txt', sep='\t', header=TRUE, stringsAsFactors = FALSE)
+metadata <- dplyr::select(metadata, c('Run_s', 'gender_s', 'tissue_region_s', 'treatment_s'))
+```
+
+```{r}
+head(metadata, n = 20)
+```
+
+This file describes the experimental design.
+We are concerned with three major experimental conditions: gender (male vs female), brain region (hypothalamus vs cortex), and treatment (dexamethasone vs control). Combinatorially, we could have a possible of 2^3 = 8 conditions. For each condition, three biological replicates were sequenced, so we have a total of 24 samples.
+The column 'gender_s' lists the gender of the mouse for each sample and can either be 'female' or 'male.' The 'tissue_region_s' column lists the brain region from which the sample was extracted and can either be 'Cotex' or 'Hypothalamus.' The 'treatment_s' column lists whether the sample was subjected to dexamethasone treatment and can either be 'Dexamethasone' or 'Vehicle.'
+The 'Run_s' column is the SRA run name. The kallisto quantifications are titled with these SRA run names.
+
+
+Finally, we add the path names of the kallisto output directories to the metadata table. We use the SRA run names listed under Run_s to identify the folders we must use for the correpsonding kallisto quantifications:
+
+```{r}
+metadata <- dplyr::mutate(metadata,
+  path = file.path('..', '..', '..', 'SRP100701', 'kallisto', Run_s, 'abundance.h5'))
+head(metadata)
+```
+
+It is important to spot check the metadata file again to make sure that the kallisto runs correspond to the accession numbers in the table, so that each row is associated with the correct sample.
+
+We rename the 'Run_s' column to 'sample.' 'sample' and 'path' are the two column names that sleuth will need to find the sample name and the path of the kallisto qunatifications.
+
+```{r}
+metadata <- dplyr::rename(metadata, sample = Run_s)
+head(metadata)
+```
+
+## Associating transcripts to genes
+
+The sample quantifications performed by kallisto have produced transcript abundance and count estimates.
+These have been parsed by sleuth in the steps just performed, however sleuth does not "know" about genes yet.
+To perform gene-level analysis sleuth must parse a gene annotation.
+One easy way to do this is using biomaRt and Ensembl:
+
+```{r cache=TRUE}
+mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
+  dataset = "mmusculus_gene_ensembl",
+  host = "dec2015.archive.ensembl.org")
+  # host = "ensembl.org")
+ttg <- biomaRt::getBM(
+  attributes = c("ensembl_transcript_id", "transcript_version",
+  "ensembl_gene_id", "external_gene_name", "description",
+  "transcript_biotype"),
+  mart = mart)
+ttg <- dplyr::rename(ttg, target_id = ensembl_transcript_id,
+  ens_gene = ensembl_gene_id, ext_gene = external_gene_name)
+ttg <- dplyr::select(ttg, c('target_id', 'ens_gene', 'ext_gene'))
+head(ttg)
+```
+
+The resulting table contains Ensembl gene names ('ens_gene') and the associated transcripts ('target_id'). Note that the gene-transcript mapping must be compatible with the transcriptome used with kallisto.
+In other words, to use Ensembl transcript-gene associations kallisto was run using the Ensembl transcriptome.
+
+# Preparing the analysis
+
+The next step is to build a sleuth object. The sleuth object contains specification of the experimental design, a map describing grouping of transcripts into genes (or other groups), and a number of user specific parameters. In the example that follows, `metadata` is the experimental design and `target_mapping` describes the transcript groupings into genes previously constructed.  Furthermore, we provide an aggregation_column, the column name of in 'target_mapping' table that is used to aggregate the transcripts.  When both 'target_mapping' and 'aggregation_column' are provided, sleuth will automatically run in gene mode, returning gene differential expression results that came from the aggregation of transcript p-values.
+
+```{r cache=TRUE}
+so <- sleuth_prep(metadata, target_mapping = ttg,
+  aggregation_column = 'ens_gene', extra_bootstrap_summary = TRUE)
+```
+
+
+# The analysis
+
+We want to examine what genes are differential as a result of dexamethasone treatment, while accounting for the differences that are caused by differences in tissue region and gender of the mice. In other words, we will statistically test for genes that are affected by dexamethasone treatment, while controlling for differences in the other two experimental conditions.
+Thus we will fit two models. The first is known as the "reduced model", which includes the two parameters corresponding to the two experimental conditions we are controlling for (gender and brain region).
+The second model is known as the full model, and it includes all three parameters.
+We will compare the full model to the reduced model with the likelihood ratio test. Using the likelihood ratio test, sleuth identifies genes whose abundances are significantly better explained when treatment is taken into account, while accounting for baseline differences that may be explained by gender and brain region.  You may also account for batch effects in the same way by using batch labels instead of 'gender_s' and 'tissue_region_s.'
+The code for performing the fitting are:
+
+```{r cache=TRUE}
+so <- sleuth_fit(so, ~gender_s + tissue_region_s, 'reduced')
+so <- sleuth_fit(so, ~gender_s + tissue_region_s + treatment_s, 'full')
+```
+The likelihood ratio test (lrt) is performed with
+
+```{r}
+so <- sleuth_lrt(so, 'reduced', 'full')
+```
+
+
+# Obtaining gene-level differential expression results
+When running the command 'sleuth_results,' sleuth uses the p-values from comparing transcripts to make a gene-level determination and perform gene differential expression.
+
+```{r}
+sleuth_table_gene <- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE)
+sleuth_table_gene <- dplyr::filter(sleuth_table_gene, qval <= 0.05)
+```
+
+
+The most significantly differential genes are
+
+```{r}
+head(sleuth_table_gene, 20)
+```
+
+The 'num_aggregated_transcripts' column lists the number of transcripts used to make the gene determination. 'pval' displays the p-value for the gene. 'qval' displays the Benjamini-Hochberg-adjusted false discovery rate for the gene.
+
+# Obtaining consistent transcript-level differential expression results
+Because gene results are built on transcript results, the gene and transcript results are entirely consistent and compatible with each other. To visualize the transcript results that led to the gene results above, one merely runs sleuth_results again but this time setting the flag 'pval_aggregate' to FALSE.
+
+```{r}
+sleuth_table_tx <- sleuth_results(so, 'reduced:full', 'lrt', show_all = FALSE, pval_aggregate = FALSE)
+sleuth_table_tx <- dplyr::filter(sleuth_table_tx, qval <= 0.05)
+head(sleuth_table_tx, 20)
+```
+The transcript pvals listed in sleuth_table_tx were the ones aggregated to obtain the gene pvals in sleuth_table_gene.  In fact, the most differential transcript is one from the gene Fam107a, which is also the most differential gene.
+
+# Visualizing the results
+One can visualize the results within our R shiny app by calling:
+
+```{r eval=FALSE}
+sleuth_live(so)
+```
+
+This will open a new browser that runs the R shiny app. One can visualize the transcript dynamics that resulted in these gene differential results under 'analysis' -> 'gene view.' Enterring the Ensembl gene name and selecting 'ens_gene' from the 'genes from' dropdown will display each transcript corresponding to that gene. 'analyses' -> 'test table' will provide the same results as sleuth_table.  As we previously mentioned, because our gene results are based on the transcript results, there is no need to visualize gene abundances separately. Instead, one can use the transcript abundances as the evidence for the gene level differential expression.

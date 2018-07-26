@@ -17,7 +17,13 @@ output:
 abstract: "This walkthrough teaches the use of sleuth for analysis of experimental designs with multiple covariates via an example of conditioning on batch effect."
 ---
 
+# Warning
+
+This tutorial is outdated with the release of sleuth v.0.30.0, which performs gene differential expression by aggregating p-values from transcript differential expression. This tutorial will be retained here for purposes of maintaining a record but will no longer be supported. We recommend that users switch to the updated version of sleuth.
+
+
 # Introduction
+NOTE: This walkthrough is outdated with the release of sleuth v0.30.0, which uses transcript p-value aggregation instead of transcript count aggregation for performing gene differential expression. A new version of this walkthrough corresponding to sleuth v0.30.0 is available here: [insert HML]
 
 This walkthrough teaches how to test for differential expression in a way that is informed by known batch effects in the data.
 The example uses data from the paper Bottomly et al., [Evaluating Gene Expression in C57BL/6J and DBA/2J Mouse Striatum Using RNA-Seq and Microarrays](TODO), _PLoS One_, 2011.
